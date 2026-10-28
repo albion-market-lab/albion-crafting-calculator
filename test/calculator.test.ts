@@ -35,6 +35,22 @@ describe("calculateMaterials", () => {
     expect(result.shoppingList).toEqual([{ itemId: "RAW_A", quantity: 6 }, { itemId: "RAW_B", quantity: 1 }, { itemId: "SPECIAL", quantity: 1 }]);
   });
 
+  it("aggregates a shared intermediate before refining batch rounding", () => {
+    const result = calculateMaterials({
+      targets: [{ itemId: "BATCH_ITEM", quantity: 3 }, { itemId: "MULTI_MATERIAL_ITEM", quantity: 1 }],
+      catalog: catalogFixture,
+    });
+
+    expect(result.refiningPlan.filter(({ itemId }) => itemId === "REFINED_A")).toEqual([
+      { itemId: "REFINED_A", requiredQuantity: 5, processCount: 3, outputQuantity: 6, surplusQuantity: 1 },
+    ]);
+    expect(result.shoppingList).toEqual([
+      { itemId: "RAW_A", quantity: 9 },
+      { itemId: "RAW_B", quantity: 2 },
+      { itemId: "SPECIAL", quantity: 1 },
+    ]);
+  });
+
   it("rounds process count using recipe output quantity", () => {
     const result = calculateMaterials({ targets: [{ itemId: "BATCH_ITEM", quantity: 4 }], catalog: catalogFixture });
     expect(result.craftOutputs).toEqual([{ itemId: "BATCH_ITEM", requiredQuantity: 4, processCount: 2, outputQuantity: 6, surplusQuantity: 2 }]);
