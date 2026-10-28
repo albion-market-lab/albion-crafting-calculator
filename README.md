@@ -68,6 +68,20 @@ Output minimal:
 - Saat tak ada kandidat harga lengkap, rekomendasi **tidak mengarang kota**.
 - Siklus resep, referensi item hilang, dan resep tidak lengkap menghasilkan error terstruktur.
 
+## Data master yang sudah siap (28 Oktober 2026)
+
+Seed data kini tersedia di Google Sheets proyek:
+- `Items`: 11.223 item ID dengan `tier`, `enchantment`, kategori, dan flags resep.
+- `Craft Recipes`: 15.325 ingredient rows untuk 6.847 recipe ID equipment.
+- `Refining Recipes`: 225 ingredient rows untuk 115 recipe ID standar.
+- `Market Prices`: **kosong** sampai hasil scan pribadi masuk lewat receiver.
+
+**Penting untuk implementasi:** `recipe_id` **berulang** untuk setiap bahan dalam satu resep. Kelompokkan baris berdasarkan `recipe_id`; jangan menghitung setiap baris sebagai satu resep/output terpisah. Untuk raw kebutuhan, telusuri `Craft Recipes` → `Refining Recipes` secara rekursif, lalu agregasikan hasil lintas banyak target.
+
+Cakupan master belum 100% dari seluruh game. Jika ID item tidak punya resep, resep tidak tersedia, atau material bertipe khusus (artifact, token, enchanted rock/stone alternatif), **hasilkan warning eksplisit** dan jangan menyamakan unknown dengan 0. Resep yang tercakup berasal dari ekstraksi sekunder, dan perlu validasi patch sebelum dianggap final.
+
+**Sumber harga tetap private-only:** tidak mengambil harga dari API komunitas dan tidak mengunggah hasil scan pribadi ke komunitas. Sheet harga masih kosong hingga receiver diimplementasikan.
+
 ## Ekosistem repositori
 
 | Repositori | Tanggung jawab |
