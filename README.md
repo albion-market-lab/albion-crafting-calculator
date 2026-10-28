@@ -1,8 +1,39 @@
 # Albion Crafting Calculator
 
-> Mesin perhitungan multi-item crafting **Albion Market Lab**. Status: **perencanaan — implementasi belum dimulai**.
+> Mesin perhitungan multi-item crafting **Albion Market Lab**. Status: **fondasi perhitungan material tersedia; integrasi harga belum diimplementasikan**.
 
 Library ini berisi **logika murni**, tidak bergantung langsung pada UI, Google Sheets, API, atau database. Data katalog dan snapshot harga diberikan sebagai input.
+
+## Implementasi tahap pertama
+
+Fondasi TypeScript saat ini menyediakan:
+
+- resolver item serta resep crafting/refining dari katalog yang disuntikkan;
+- kalkulasi multi-target, agregasi material, recursive refining, dan pembulatan berdasarkan `outputQuantity`;
+- crafting output, refining plan, shopping list terminal, dan warning terminal material;
+- error terstruktur untuk input/katalog invalid, ID item hilang, resep hilang, dan circular dependency.
+
+Katalog wajib menandai bahan yang memang boleh dibeli dengan `purchasable: true`. Item tanpa resep yang tidak ditandai demikian dianggap sebagai data resep yang belum tersedia dan menghasilkan error; calculator tidak menebaknya sebagai bahan terminal.
+
+```ts
+import { calculateMaterials } from "@albion-market-lab/crafting-calculator";
+
+const result = calculateMaterials({
+  targets: [{ itemId: "VALID_CATALOG_ITEM_ID", quantity: 10 }],
+  catalog: { items, craftingRecipes, refiningRecipes },
+});
+```
+
+Fixture unit test memakai ID dan rasio sintetis untuk menguji aritmetika. Fixture tersebut bukan data atau resep Albion.
+
+### Menjalankan validasi
+
+```sh
+pnpm install
+pnpm typecheck
+pnpm test
+pnpm build
+```
 
 ## Kebutuhan utama
 Pengguna dapat membuat **satu crafting plan berisi banyak target sekaligus**: misalnya 100 unit cloth armor T6, 20 unit plate shoes T5, dan item lain dengan tier/quantity berbeda. Setiap target dipilih menggunakan **ID item nyata** dari [catalog](https://github.com/albion-market-lab/albion-item-catalog).
