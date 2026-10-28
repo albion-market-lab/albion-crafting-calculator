@@ -13,16 +13,28 @@ Fondasi TypeScript saat ini menyediakan:
 - crafting output, refining plan, shopping list terminal, dan warning terminal material;
 - error terstruktur untuk input/katalog invalid, ID item hilang, resep hilang, dan circular dependency.
 
-Katalog wajib menandai bahan yang memang boleh dibeli dengan `purchasable: true`. Item tanpa resep yang tidak ditandai demikian dianggap sebagai data resep yang belum tersedia dan menghasilkan error; calculator tidak menebaknya sebagai bahan terminal.
+Calculator menerima kontrak `CatalogData` v3 dengan `terminalStatus: terminal | requires_recipe | unknown | unsupported` dan metadata tambahan dari importer. Hanya `terminal` dengan `purchasable: true` yang masuk shopping list. Status yang bertentangan dengan flag tersebut atau keberadaan recipe ditolak sebagai `INVALID_CATALOG`.
 
 ```ts
-import { calculateMaterials } from "@albion-market-lab/crafting-calculator";
+import { assertCatalogDataV3, assertCatalogManifestV3, calculateMaterials } from "@albion-market-lab/crafting-calculator";
+
+assertCatalogDataV3(catalogJson);
+assertCatalogManifestV3(manifestJson, catalogJson); // manifest.json tetap artefak terpisah
 
 const result = calculateMaterials({
   targets: [{ itemId: "VALID_CATALOG_ITEM_ID", quantity: 10 }],
-  catalog: { items, craftingRecipes, refiningRecipes },
+  catalog: catalogJson,
 });
 ```
+
+Policy material tanpa refining recipe:
+
+- `terminal` → shopping list;
+- `requires_recipe` → `REFINING_RECIPE_NOT_FOUND`;
+- `unknown` → `UNKNOWN_MATERIAL`;
+- `unsupported` → `UNSUPPORTED_MATERIAL`.
+
+Error material menyertakan `itemId`, `terminalStatus`, dan `reason` untuk UI. Calculator tidak mengubah item ID/quantity dan tidak mengimplementasikan ulang importer.
 
 Fixture unit test memakai ID dan rasio sintetis untuk menguji aritmetika. Fixture tersebut bukan data atau resep Albion.
 

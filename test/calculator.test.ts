@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { calculateMaterials, CalculationError } from "../src/index.js";
+import { assertCatalogManifestV3, calculateMaterials, CalculationError } from "../src/index.js";
 import type { CatalogData } from "../src/types.js";
 import { catalogFixture } from "./fixtures/catalog.js";
 
-const errorCode = (fn: () => unknown): string | undefined => {
-  try { fn(); } catch (error) { return error instanceof CalculationError ? error.code : undefined; }
+const calculationError = (fn: () => unknown): CalculationError | undefined => {
+  try { fn(); } catch (error) { return error instanceof CalculationError ? error : undefined; }
   return undefined;
 };
+const errorCode = (fn: () => unknown): string | undefined => calculationError(fn)?.code;
 
 describe("calculateMaterials", () => {
   it("calculates one target with one terminal material", () => {
@@ -52,9 +53,10 @@ describe("calculateMaterials", () => {
   it("detects circular refining dependencies and reports the path", () => {
     const catalog: CatalogData = {
       ...catalogFixture,
+      items: catalogFixture.items.map((item) => item.itemId === "RAW_A" ? { ...item, terminalStatus: "requires_recipe", purchasable: false, hasRefiningRecipe: true } : item),
       refiningRecipes: [
         ...catalogFixture.refiningRecipes,
-        { recipeId: "R_RAW_A", recipeType: "refining", outputItemId: "RAW_A", outputQuantity: 1, ingredients: [{ itemId: "REFINED_A", quantity: 1 }] },
+        { recipeId: "R_RAW_A", recipeType: "refining", outputItemId: "RAW_A", outputQuantity: 1, ingredients: [{ itemId: "REFINED_A", quantity: 1 }], validationStatus: "fixture", sourceUrl: "fixture" },
       ],
     };
     expect(errorCode(() => calculateMaterials({ targets: [{ itemId: "MULTI_MATERIAL_ITEM", quantity: 1 }], catalog }))).toBe("CIRCULAR_DEPENDENCY");
@@ -69,6 +71,33 @@ describe("calculateMaterials", () => {
   it("does not treat an unknown recipe as a terminal material", () => {
     const catalog: CatalogData = { ...catalogFixture, items: catalogFixture.items.map((item) => item.itemId === "REFINED_A" ? { ...item, purchasable: false } : item), refiningRecipes: catalogFixture.refiningRecipes.filter((recipe) => recipe.outputItemId !== "REFINED_A") };
     expect(errorCode(() => calculateMaterials({ targets: [{ itemId: "MULTI_MATERIAL_ITEM", quantity: 1 }], catalog }))).toBe("REFINING_RECIPE_NOT_FOUND");
+  });
+
+  it.each([
+    ["unknown", "UNKNOWN_MATERIAL"],
+    ["unsupported", "UNSUPPORTED_MATERIAL"],
+  ] as const)("returns a structured error for %s material", (terminalStatus, code) => {
+    const catalog: CatalogData = { ...catalogFixture, items: catalogFixture.items.map((item) => item.itemId === "SPECIAL" ? { ...item, terminalStatus, purchasable: false } : item) };
+    expect(calculationError(() => calculateMaterials({ targets: [{ itemId: "BATCH_ITEM", quantity: 1 }], catalog }))).toMatchObject({
+      code,
+      details: { itemId: "SPECIAL", terminalStatus, reason: expect.any(String) },
+    });
+  });
+
+  it("rejects contradictory terminal status and purchasable flag", () => {
+    const catalog: CatalogData = { ...catalogFixture, items: catalogFixture.items.map((item) => item.itemId === "RAW_A" ? { ...item, purchasable: false } : item) };
+    expect(errorCode(() => calculateMaterials({ targets: [{ itemId: "ONE_MATERIAL_ITEM", quantity: 1 }], catalog }))).toBe("INVALID_CATALOG");
+  });
+
+  it("rejects duplicate recipe IDs even when outputs differ", () => {
+    const catalog: CatalogData = { ...catalogFixture, craftingRecipes: catalogFixture.craftingRecipes.map((recipe, index) => index === 1 ? { ...recipe, recipeId: catalogFixture.craftingRecipes[0]!.recipeId } : recipe) };
+    expect(errorCode(() => calculateMaterials({ targets: [{ itemId: "ONE_MATERIAL_ITEM", quantity: 1 }], catalog }))).toBe("INVALID_CATALOG");
+  });
+
+  it("validates the separate catalog manifest boundary", () => {
+    expect(() => assertCatalogManifestV3({ schemaVersion: "3", importedAt: "2026-10-28T00:00:00Z", source: "fixture", counts: { items: 1, craftingRecipes: 0, refiningRecipes: 0 } })).not.toThrow();
+    expect(errorCode(() => assertCatalogManifestV3({ schemaVersion: "2" }))).toBe("INVALID_CATALOG");
+    expect(errorCode(() => assertCatalogManifestV3({ schemaVersion: "3", importedAt: "2026-10-28T00:00:00Z", source: "fixture", counts: { items: 0, craftingRecipes: 0, refiningRecipes: 0 } }, catalogFixture))).toBe("INVALID_CATALOG");
   });
 
   it("aggregates duplicate target rows before applying output rounding", () => {

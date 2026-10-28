@@ -10,7 +10,19 @@ export class RecipeResolver {
     this.items = this.indexUnique(catalog.items, (value) => value.itemId, "item");
     this.crafting = this.indexUnique(catalog.craftingRecipes, (value) => value.outputItemId, "crafting recipe");
     this.refining = this.indexUnique(catalog.refiningRecipes, (value) => value.outputItemId, "refining recipe");
+    catalog.items.forEach((item) => {
+      const hasRecipe = this.crafting.has(item.itemId) || this.refining.has(item.itemId);
+      const validStatus = ["terminal", "requires_recipe", "unknown", "unsupported"].includes(item.terminalStatus);
+      if (!validStatus || (item.terminalStatus === "terminal") !== item.purchasable || (item.terminalStatus !== "requires_recipe" && hasRecipe)) {
+        throw new CalculationError("INVALID_CATALOG", `Catalog status for '${item.itemId}' contradicts purchasable or recipe data.`, { itemId: item.itemId, terminalStatus: item.terminalStatus, purchasable: item.purchasable, hasRecipe });
+      }
+    });
+    const recipeIds = new Set<string>();
     [...catalog.craftingRecipes, ...catalog.refiningRecipes].forEach((recipe) => {
+      if (!recipe.recipeId || recipeIds.has(recipe.recipeId)) {
+        throw new CalculationError("INVALID_CATALOG", `Duplicate or empty recipe ID '${recipe.recipeId}'.`, { recipeId: recipe.recipeId });
+      }
+      recipeIds.add(recipe.recipeId);
       if (!Number.isInteger(recipe.outputQuantity) || recipe.outputQuantity <= 0 || recipe.ingredients.length === 0) {
         throw new CalculationError("INVALID_CATALOG", `Invalid recipe ${recipe.recipeId}.`, { recipeId: recipe.recipeId });
       }

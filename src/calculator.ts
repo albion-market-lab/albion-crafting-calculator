@@ -39,9 +39,13 @@ export function calculateMaterials(input: CalculationInput): CalculationResult {
     const item = resolver.requireItem(itemId);
     const recipe = resolver.getRefiningRecipe(itemId);
     if (!recipe) {
-      if (!item.purchasable) throw new CalculationError("REFINING_RECIPE_NOT_FOUND", `Non-terminal material '${itemId}' has no refining recipe.`, { itemId });
-      depths.set(itemId, 0);
-      return 0;
+      if (item.terminalStatus === "terminal") {
+        depths.set(itemId, 0);
+        return 0;
+      }
+      if (item.terminalStatus === "unknown") throw new CalculationError("UNKNOWN_MATERIAL", `Material '${itemId}' has unknown catalog status and cannot be purchased safely.`, { itemId, terminalStatus: item.terminalStatus, reason: "No verified terminal classification or refining recipe." });
+      if (item.terminalStatus === "unsupported") throw new CalculationError("UNSUPPORTED_MATERIAL", `Material '${itemId}' requires unsupported handling.`, { itemId, terminalStatus: item.terminalStatus, reason: "The catalog marks this material as unsupported." });
+      throw new CalculationError("REFINING_RECIPE_NOT_FOUND", `Required refining recipe for '${itemId}' was not found.`, { itemId, terminalStatus: item.terminalStatus, reason: "Catalog status requires a recipe." });
     }
     const depth = 1 + Math.max(...recipe.ingredients.map((ingredient) => visit(ingredient.itemId, [...path, itemId])));
     depths.set(itemId, depth);

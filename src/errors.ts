@@ -4,6 +4,8 @@ export type CalculationErrorCode =
   | "ITEM_NOT_FOUND"
   | "CRAFTING_RECIPE_NOT_FOUND"
   | "REFINING_RECIPE_NOT_FOUND"
+  | "UNKNOWN_MATERIAL"
+  | "UNSUPPORTED_MATERIAL"
   | "CIRCULAR_DEPENDENCY";
 
 export class CalculationError extends Error {

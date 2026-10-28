@@ -7,14 +7,22 @@ export interface CatalogItem {
   itemId: string;
   displayName: string;
   tier?: number;
+  enchantment: number;
   category?: string;
-  /** Explicitly marks an item that should be bought instead of expanded. */
   purchasable: boolean;
+  terminalStatus: TerminalStatus;
+  nameStatus: string;
+  hasCraftingRecipe: boolean;
+  hasRefiningRecipe: boolean;
+  sourceUrl: string;
 }
+
+export type TerminalStatus = "terminal" | "requires_recipe" | "unknown" | "unsupported";
 
 export interface RecipeIngredient {
   itemId: string;
   quantity: number;
+  returnEligible?: boolean;
 }
 
 interface RecipeBase {
@@ -22,6 +30,10 @@ interface RecipeBase {
   outputItemId: string;
   outputQuantity: number;
   ingredients: RecipeIngredient[];
+  craftBonusCity?: string;
+  validationStatus: string;
+  notes?: string;
+  sourceUrl: string;
 }
 
 export interface CraftingRecipe extends RecipeBase {
@@ -36,6 +48,13 @@ export interface CatalogData {
   items: CatalogItem[];
   craftingRecipes: CraftingRecipe[];
   refiningRecipes: RefiningRecipe[];
+}
+
+export interface CatalogManifestV3 {
+  schemaVersion: "3";
+  importedAt: string;
+  source: string;
+  counts: { items: number; craftingRecipes: number; refiningRecipes: number };
 }
 
 export interface CalculationInput {
