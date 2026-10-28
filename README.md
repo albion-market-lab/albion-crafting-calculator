@@ -1,1 +1,83 @@
-# albion-crafting-calculator
+# Albion Crafting Calculator
+
+> Mesin perhitungan multi-item crafting **Albion Market Lab**. Status: **perencanaan — implementasi belum dimulai**.
+
+Library ini berisi **logika murni**, tidak bergantung langsung pada UI, Google Sheets, API, atau database. Data katalog dan snapshot harga diberikan sebagai input.
+
+## Kebutuhan utama
+Pengguna dapat membuat **satu crafting plan berisi banyak target sekaligus**: misalnya 100 unit cloth armor T6, 20 unit plate shoes T5, dan item lain dengan tier/quantity berbeda. Setiap target dipilih menggunakan **ID item nyata** dari [catalog](https://github.com/albion-market-lab/albion-item-catalog).
+
+## Alur kalkulasi
+1. Terima daftar `{ itemId, quantity }` (quantity > 0).
+2. Ambil resep crafting untuk setiap target.
+3. Telusuri resep refining secara **rekursif** sampai bahan terminal/purchasable.
+4. Gabungkan bahan yang sama lintas semua target **sebelum** membuat shopping list.
+5. Terapkan aturan kuantitas dan pembulatan tiap resep sesuai output per proses; jangan membulatkan total di tempat yang salah.
+6. Cocokkan bahan yang harus dibeli dengan snapshot harga lokal dari [receiver](https://github.com/albion-market-lab/albion-market-receiver).
+7. Untuk setiap material, rekomendasikan kota BO dari **Bridgewatch, Martlock, Lymhurst, Fort Sterling, Thetford** berdasarkan harga yang tersedia.
+8. Kembalikan shopping list per kota, rencana refining, target output crafting, estimasi modal, dan status kelengkapan data.
+
+## Kontrak input/output (rancangan)
+
+```ts
+type CraftTarget = { itemId: string; quantity: number };
+
+type MarketPrice = {
+  itemId: string;
+  city: string;
+  quality?: number;
+  highestBuyPrice?: number | null;
+  highestBuyObservedAt?: string | null;
+  lowestSellPrice?: number | null;
+  lowestSellObservedAt?: string | null;
+};
+
+type CalculationInput = {
+  targets: CraftTarget[];
+  catalog: CatalogData;          // dari albion-item-catalog
+  prices: MarketPrice[];         // snapshot hasil scan pribadi
+  staleAfterHours: number;       // konfigurasi, contoh 6
+  asOf: string;                  // waktu evaluasi status harga
+};
+```
+
+Output minimal:
+- `craftOutputs`: target equipment dan kuantitas.
+- `refiningPlan`: jenis refined material, tier, dan kuantitas yang harus diproses.
+- `shoppingList`: material mentah/terminal, quantity, kota usulan, dan dasar harga BO.
+- `priceWarnings`: harga **segar / lama / kosong** per item-kota sesuai timestamp.
+- `estimatedCapital`: total hanya bila seluruh komponen harga relevan tersedia; jika tidak, tandai **parsial/tidak lengkap**.
+- `recipeWarnings`: resep tidak tersedia, material khusus, atau dependensi tidak valid.
+
+## Aturan harga & buy order
+- Data harga **hanya hasil collector pribadi**; tidak memanggil AODP Community API.
+- Harga lama **tetap boleh ditampilkan** dengan usia dan peringatan.
+- Harga kosong **jangan diisi 0**, jangan menghasilkan kepastian kota termurah bila datanya belum lengkap.
+- Kandidat harga penawaran BO: `highest_buy_price + 1` silver **sebagai strategi default yang bisa dikonfigurasi**, bukan jaminan order terisi.
+- Kandidat kota diurutkan berdasar estimasi harga penawaran valid; ingat bahwa harga antar-kota dengan timestamp berbeda tidak sepenuhnya setara.
+- Tidak menebak harga material yang belum pernah discan.
+
+## Yang sengaja tidak dihitung pada MVP
+**Resource Return Rate (RRR), Focus, cashback, biaya station, fee/tax, risiko caravan, serta realisasi penjualan Black Market.** Keuntungan pengembalian resource diperlakukan sebagai bonus di luar estimasi dasar. Pemilihan item BM dan eksekusi BO/refine/craft/sell order tetap manual di game.
+
+## Kriteria selesai / unit test wajib
+- Multi-target yang berbagi bahan menghasilkan **jumlah gabungan** yang benar.
+- Resep refining multi-tier dirunut hingga bahan terminal sesuai resep nyata.
+- Output quantity per proses dan pembulatan diuji.
+- Harga lama tetap terlihat, harga kosong menghasilkan status *incomplete*, bukan modal salah.
+- Saat tak ada kandidat harga lengkap, rekomendasi **tidak mengarang kota**.
+- Siklus resep, referensi item hilang, dan resep tidak lengkap menghasilkan error terstruktur.
+
+## Ekosistem repositori
+
+| Repositori | Tanggung jawab |
+| --- | --- |
+| [albion-item-catalog](https://github.com/albion-market-lab/albion-item-catalog) | Master data item dan resep crafting/refining |
+| [albion-market-receiver](https://github.com/albion-market-lab/albion-market-receiver) | Menerima scan market pribadi dan menyimpan harga ke Google Sheets |
+| [albion-crafting-calculator](https://github.com/albion-market-lab/albion-crafting-calculator) | Menghitung kebutuhan bahan, estimasi modal, dan rekomendasi kota BO |
+| [albion-crafting-web](https://github.com/albion-market-lab/albion-crafting-web) | Antarmuka untuk merencanakan banyak target crafting |
+
+**Alur:** Albion Online → collector lokal → receiver → Google Sheets → web UI + calculator. Katalog resep berasal dari data game, **bukan** dari Google Sheets.
+
+## Di luar scope
+Packet collection, menulis Google Sheets, UI, dan otomasi transaksi di Albion.
