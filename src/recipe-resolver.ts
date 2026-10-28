@@ -23,12 +23,12 @@ export class RecipeResolver {
         throw new CalculationError("INVALID_CATALOG", `Duplicate or empty recipe ID '${recipe.recipeId}'.`, { recipeId: recipe.recipeId });
       }
       recipeIds.add(recipe.recipeId);
-      if (!Number.isInteger(recipe.outputQuantity) || recipe.outputQuantity <= 0 || recipe.ingredients.length === 0) {
+      if (!Number.isSafeInteger(recipe.outputQuantity) || recipe.outputQuantity <= 0 || recipe.ingredients.length === 0) {
         throw new CalculationError("INVALID_CATALOG", `Invalid recipe ${recipe.recipeId}.`, { recipeId: recipe.recipeId });
       }
       this.requireItem(recipe.outputItemId);
       recipe.ingredients.forEach((ingredient) => {
-        if (!Number.isInteger(ingredient.quantity) || ingredient.quantity <= 0) {
+        if (!Number.isSafeInteger(ingredient.quantity) || ingredient.quantity <= 0) {
           throw new CalculationError("INVALID_CATALOG", `Invalid ingredient quantity in ${recipe.recipeId}.`, { recipeId: recipe.recipeId, itemId: ingredient.itemId });
         }
         this.requireItem(ingredient.itemId);

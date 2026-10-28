@@ -36,6 +36,14 @@ Policy material tanpa refining recipe:
 
 Error material menyertakan `itemId`, `terminalStatus`, dan `reason` untuk UI. Calculator tidak mengubah item ID/quantity dan tidak mengimplementasikan ulang importer.
 
+Golden test Albion memakai fixture CatalogData v3 dan expected result yang dihitung independen untuk Scholar Robe T6 ×100 + Soldier Boots T5 ×20. Test membandingkan `craftOutputs`, seluruh urutan `refiningPlan`, dan `shoppingList`; RRR/Focus tidak dihitung. Jalankan dengan:
+
+```sh
+pnpm test test/catalog-v3-integration.test.ts
+```
+
+Raw terminal normal tidak menghasilkan `recipeWarnings`. Terminal non-raw seperti artifact tetap muncul di shopping list dengan warning `SPECIAL_TERMINAL_MATERIAL` agar procurement khusus tidak hilang diam-diam.
+
 Fixture unit test memakai ID dan rasio sintetis untuk menguji aritmetika. Fixture tersebut bukan data atau resep Albion.
 
 ## Estimasi buy order

@@ -8,9 +8,9 @@ const item = (itemId: string, displayName: string, terminalStatus: TerminalStatu
 /** Synthetic, arithmetic-only data. These IDs and ratios are not Albion recipes. */
 export const catalogFixture: CatalogData = {
   items: [
-    item("RAW_A", "Raw A", "terminal"),
-    item("RAW_B", "Raw B", "terminal"),
-    item("SPECIAL", "Special terminal", "terminal"),
+    { ...item("RAW_A", "Raw A", "terminal"), category: "raw" },
+    { ...item("RAW_B", "Raw B", "terminal"), category: "raw" },
+    { ...item("SPECIAL", "Special terminal", "terminal"), category: "special" },
     item("REFINED_A", "Refined A", "requires_recipe", false, true),
     item("REFINED_HIGH", "Refined high", "requires_recipe", false, true),
     item("ONE_MATERIAL_ITEM", "One-material item", "requires_recipe", true),

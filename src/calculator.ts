@@ -3,7 +3,9 @@ import { RecipeResolver } from "./recipe-resolver.js";
 import type { CalculationInput, CalculationResult, ProcessPlan, RecipeWarning } from "./types.js";
 
 const add = (map: Map<string, number>, itemId: string, quantity: number): void => {
-  map.set(itemId, (map.get(itemId) ?? 0) + quantity);
+  const total = (map.get(itemId) ?? 0) + quantity;
+  if (!Number.isSafeInteger(total)) throw new CalculationError("INVALID_INPUT", `Quantity for '${itemId}' exceeds the safe integer range.`, { itemId, quantity: total });
+  map.set(itemId, total);
 };
 
 export function calculateMaterials(input: CalculationInput): CalculationResult {
@@ -11,7 +13,7 @@ export function calculateMaterials(input: CalculationInput): CalculationResult {
   const resolver = new RecipeResolver(input.catalog);
   const targets = new Map<string, number>();
   for (const target of input.targets) {
-    if (!target.itemId || !Number.isInteger(target.quantity) || target.quantity <= 0) {
+    if (!target.itemId || !Number.isSafeInteger(target.quantity) || target.quantity <= 0) {
       throw new CalculationError("INVALID_INPUT", "Target quantity must be a positive integer.", { target });
     }
     add(targets, target.itemId, target.quantity);
@@ -23,6 +25,7 @@ export function calculateMaterials(input: CalculationInput): CalculationResult {
     const recipe = resolver.requireCraftingRecipe(itemId);
     const processCount = Math.ceil(requiredQuantity / recipe.outputQuantity);
     const outputQuantity = processCount * recipe.outputQuantity;
+    if (!Number.isSafeInteger(outputQuantity)) throw new CalculationError("INVALID_INPUT", `Craft output for '${itemId}' exceeds the safe integer range.`, { itemId, outputQuantity });
     craftOutputs.push({ itemId, requiredQuantity, processCount, outputQuantity, surplusQuantity: outputQuantity - requiredQuantity });
     recipe.ingredients.forEach((ingredient) => add(materialDemand, ingredient.itemId, ingredient.quantity * processCount));
   }
@@ -61,6 +64,7 @@ export function calculateMaterials(input: CalculationInput): CalculationResult {
     const recipe = resolver.getRefiningRecipe(itemId)!;
     const processCount = Math.ceil(requiredQuantity / recipe.outputQuantity);
     const outputQuantity = processCount * recipe.outputQuantity;
+    if (!Number.isSafeInteger(outputQuantity)) throw new CalculationError("INVALID_INPUT", `Refining output for '${itemId}' exceeds the safe integer range.`, { itemId, outputQuantity });
     refiningPlan.push({ itemId, requiredQuantity, processCount, outputQuantity, surplusQuantity: outputQuantity - requiredQuantity });
     recipe.ingredients.forEach((ingredient) => add(materialDemand, ingredient.itemId, ingredient.quantity * processCount));
   }
@@ -69,10 +73,10 @@ export function calculateMaterials(input: CalculationInput): CalculationResult {
     .filter(([itemId]) => depths.get(itemId) === 0)
     .map(([itemId, quantity]) => ({ itemId, quantity }))
     .sort((a, b) => a.itemId.localeCompare(b.itemId));
-  const recipeWarnings: RecipeWarning[] = shoppingList.map(({ itemId }) => ({
-    code: "TERMINAL_MATERIAL",
+  const recipeWarnings: RecipeWarning[] = shoppingList.filter(({ itemId }) => resolver.requireItem(itemId).category !== "raw").map(({ itemId }) => ({
+    code: "SPECIAL_TERMINAL_MATERIAL",
     itemId,
-    message: `Material '${itemId}' is explicitly terminal/purchasable and has no refining recipe.`,
+    message: `Material '${itemId}' is terminal but requires special procurement handling.`,
   }));
 
   return { craftOutputs, refiningPlan, shoppingList, recipeWarnings };

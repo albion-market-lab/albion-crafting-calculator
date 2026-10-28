@@ -76,7 +76,7 @@ export interface ShoppingListItem {
 }
 
 export interface RecipeWarning {
-  code: "TERMINAL_MATERIAL";
+  code: "SPECIAL_TERMINAL_MATERIAL";
   itemId: string;
   message: string;
 }

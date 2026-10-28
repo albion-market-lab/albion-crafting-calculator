@@ -1,0 +1,32 @@
+{
+  "targets": [
+    { "itemId": "T6_ARMOR_CLOTH_SET1", "quantity": 100 },
+    { "itemId": "T5_SHOES_PLATE_SET1", "quantity": 20 }
+  ],
+  "craftOutputs": [
+    { "itemId": "T6_ARMOR_CLOTH_SET1", "requiredQuantity": 100, "processCount": 100, "outputQuantity": 100, "surplusQuantity": 0 },
+    { "itemId": "T5_SHOES_PLATE_SET1", "requiredQuantity": 20, "processCount": 20, "outputQuantity": 20, "surplusQuantity": 0 }
+  ],
+  "refiningPlan": [
+    { "itemId": "T6_CLOTH", "requiredQuantity": 1600, "processCount": 1600, "outputQuantity": 1600, "surplusQuantity": 0 },
+    { "itemId": "T5_CLOTH", "requiredQuantity": 1600, "processCount": 1600, "outputQuantity": 1600, "surplusQuantity": 0 },
+    { "itemId": "T5_METALBAR", "requiredQuantity": 160, "processCount": 160, "outputQuantity": 160, "surplusQuantity": 0 },
+    { "itemId": "T4_CLOTH", "requiredQuantity": 1600, "processCount": 1600, "outputQuantity": 1600, "surplusQuantity": 0 },
+    { "itemId": "T4_METALBAR", "requiredQuantity": 160, "processCount": 160, "outputQuantity": 160, "surplusQuantity": 0 },
+    { "itemId": "T3_CLOTH", "requiredQuantity": 1600, "processCount": 1600, "outputQuantity": 1600, "surplusQuantity": 0 },
+    { "itemId": "T3_METALBAR", "requiredQuantity": 160, "processCount": 160, "outputQuantity": 160, "surplusQuantity": 0 },
+    { "itemId": "T2_CLOTH", "requiredQuantity": 1600, "processCount": 1600, "outputQuantity": 1600, "surplusQuantity": 0 },
+    { "itemId": "T2_METALBAR", "requiredQuantity": 160, "processCount": 160, "outputQuantity": 160, "surplusQuantity": 0 }
+  ],
+  "shoppingList": [
+    { "itemId": "T2_FIBER", "quantity": 1600 },
+    { "itemId": "T2_ORE", "quantity": 160 },
+    { "itemId": "T3_FIBER", "quantity": 3200 },
+    { "itemId": "T3_ORE", "quantity": 320 },
+    { "itemId": "T4_FIBER", "quantity": 3200 },
+    { "itemId": "T4_ORE", "quantity": 320 },
+    { "itemId": "T5_FIBER", "quantity": 4800 },
+    { "itemId": "T5_ORE", "quantity": 480 },
+    { "itemId": "T6_FIBER", "quantity": 6400 }
+  ]
+}

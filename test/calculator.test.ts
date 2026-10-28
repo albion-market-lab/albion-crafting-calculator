@@ -65,7 +65,12 @@ describe("calculateMaterials", () => {
   it("keeps an explicitly terminal special material in the shopping list", () => {
     const result = calculateMaterials({ targets: [{ itemId: "BATCH_ITEM", quantity: 1 }], catalog: catalogFixture });
     expect(result.shoppingList).toContainEqual({ itemId: "SPECIAL", quantity: 1 });
-    expect(result.recipeWarnings).toContainEqual(expect.objectContaining({ code: "TERMINAL_MATERIAL", itemId: "SPECIAL" }));
+    expect(result.recipeWarnings).toEqual([expect.objectContaining({ code: "SPECIAL_TERMINAL_MATERIAL", itemId: "SPECIAL" })]);
+  });
+
+  it("does not warn for normal raw terminal materials", () => {
+    const result = calculateMaterials({ targets: [{ itemId: "ONE_MATERIAL_ITEM", quantity: 1 }], catalog: catalogFixture });
+    expect(result.recipeWarnings).toEqual([]);
   });
 
   it("does not treat an unknown recipe as a terminal material", () => {
@@ -104,5 +109,13 @@ describe("calculateMaterials", () => {
     const result = calculateMaterials({ targets: [{ itemId: "BATCH_ITEM", quantity: 1 }, { itemId: "BATCH_ITEM", quantity: 2 }], catalog: catalogFixture });
     expect(result.craftOutputs).toHaveLength(1);
     expect(result.craftOutputs[0]).toMatchObject({ requiredQuantity: 3, processCount: 1, outputQuantity: 3 });
+  });
+
+  it.each([0, 1.5, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1])("rejects unsafe target quantity %s", (quantity) => {
+    expect(errorCode(() => calculateMaterials({ targets: [{ itemId: "ONE_MATERIAL_ITEM", quantity }], catalog: catalogFixture }))).toBe("INVALID_INPUT");
+  });
+
+  it("rejects overflow created while expanding a valid large target", () => {
+    expect(errorCode(() => calculateMaterials({ targets: [{ itemId: "ONE_MATERIAL_ITEM", quantity: Number.MAX_SAFE_INTEGER }], catalog: catalogFixture }))).toBe("INVALID_INPUT");
   });
 });
