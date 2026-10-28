@@ -68,3 +68,63 @@ export interface CalculationResult {
   shoppingList: ShoppingListItem[];
   recipeWarnings: RecipeWarning[];
 }
+
+export const ROYAL_CITIES = ["Bridgewatch", "Martlock", "Lymhurst", "Fort Sterling", "Thetford"] as const;
+export type RoyalCity = (typeof ROYAL_CITIES)[number];
+export type PriceStatus = "fresh" | "stale" | "missing";
+
+export interface MarketPrice {
+  server: string;
+  itemId: string;
+  city: string;
+  quality: number;
+  highestBuyPrice?: number | null;
+  highestBuyObservedAt?: string | null;
+  lowestSellPrice?: number | null;
+  lowestSellObservedAt?: string | null;
+}
+
+export interface BuyOrderEstimateInput {
+  shoppingList: ShoppingListItem[];
+  prices: MarketPrice[];
+  asOf: string;
+  staleAfterHours: number;
+  bidIncrement?: number;
+  server?: "East/Asia";
+  quality?: number;
+}
+
+export interface CityPriceCandidate {
+  city: RoyalCity;
+  status: PriceStatus;
+  highestBuyPrice?: number;
+  observedAt?: string;
+  ageHours?: number;
+  bidPrice?: number;
+  subtotal?: number;
+}
+
+export interface MaterialBuyOrderEstimate {
+  itemId: string;
+  quantity: number;
+  quality: number;
+  candidates: CityPriceCandidate[];
+  coverage: "complete" | "partial" | "none";
+  suggestedCity?: RoyalCity;
+  suggestedBidPrice?: number;
+  estimatedSubtotal?: number;
+}
+
+export interface PriceWarning {
+  code: "INVALID_TIMESTAMP" | "MISSING_PRICE" | "STALE_PRICE" | "PARTIAL_COVERAGE";
+  itemId: string;
+  city?: RoyalCity;
+  message: string;
+}
+
+export interface BuyOrderEstimateResult {
+  materials: MaterialBuyOrderEstimate[];
+  estimatedTotal: number | null;
+  status: "complete" | "partial" | "unavailable";
+  warnings: PriceWarning[];
+}

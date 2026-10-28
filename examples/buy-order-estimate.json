@@ -1,0 +1,53 @@
+{
+  "input": {
+    "shoppingList": [{ "itemId": "T4_ORE", "quantity": 10 }],
+    "prices": [
+      {
+        "server": "East/Asia",
+        "itemId": "T4_ORE",
+        "city": "Bridgewatch",
+        "quality": 1,
+        "highestBuyPrice": 100,
+        "highestBuyObservedAt": "2026-10-28T03:00:00Z"
+      },
+      {
+        "server": "East/Asia",
+        "itemId": "T4_ORE",
+        "city": "Martlock",
+        "quality": 1,
+        "highestBuyPrice": 90,
+        "highestBuyObservedAt": "2026-10-27T20:00:00Z"
+      }
+    ],
+    "asOf": "2026-10-28T06:00:00Z",
+    "staleAfterHours": 6,
+    "bidIncrement": 1
+  },
+  "output": {
+    "materials": [{
+      "itemId": "T4_ORE",
+      "quantity": 10,
+      "quality": 1,
+      "candidates": [
+        { "city": "Bridgewatch", "status": "fresh", "highestBuyPrice": 100, "observedAt": "2026-10-28T03:00:00.000Z", "ageHours": 3, "bidPrice": 101, "subtotal": 1010 },
+        { "city": "Martlock", "status": "stale", "highestBuyPrice": 90, "observedAt": "2026-10-27T20:00:00.000Z", "ageHours": 10, "bidPrice": 91, "subtotal": 910 },
+        { "city": "Lymhurst", "status": "missing" },
+        { "city": "Fort Sterling", "status": "missing" },
+        { "city": "Thetford", "status": "missing" }
+      ],
+      "coverage": "partial",
+      "suggestedCity": "Martlock",
+      "suggestedBidPrice": 91,
+      "estimatedSubtotal": 910
+    }],
+    "estimatedTotal": 910,
+    "status": "partial",
+    "warnings": [
+      { "code": "STALE_PRICE", "itemId": "T4_ORE", "city": "Martlock", "message": "BUY price for 'T4_ORE' in Martlock is 10 hours old." },
+      { "code": "MISSING_PRICE", "itemId": "T4_ORE", "city": "Lymhurst", "message": "BUY price for 'T4_ORE' in Lymhurst is missing." },
+      { "code": "MISSING_PRICE", "itemId": "T4_ORE", "city": "Fort Sterling", "message": "BUY price for 'T4_ORE' in Fort Sterling is missing." },
+      { "code": "MISSING_PRICE", "itemId": "T4_ORE", "city": "Thetford", "message": "BUY price for 'T4_ORE' in Thetford is missing." },
+      { "code": "PARTIAL_COVERAGE", "itemId": "T4_ORE", "message": "City coverage for 'T4_ORE' is partial; the suggested city is not a definitive cheapest-city claim." }
+    ]
+  }
+}

@@ -1,6 +1,6 @@
 # Albion Crafting Calculator
 
-> Mesin perhitungan multi-item crafting **Albion Market Lab**. Status: **fondasi perhitungan material tersedia; integrasi harga belum diimplementasikan**.
+> Mesin perhitungan multi-item crafting **Albion Market Lab**. Status: **fondasi material dan estimasi buy order dari snapshot harga pribadi tersedia**.
 
 Library ini berisi **logika murni**, tidak bergantung langsung pada UI, Google Sheets, API, atau database. Data katalog dan snapshot harga diberikan sebagai input.
 
@@ -25,6 +25,24 @@ const result = calculateMaterials({
 ```
 
 Fixture unit test memakai ID dan rasio sintetis untuk menguji aritmetika. Fixture tersebut bukan data atau resep Albion.
+
+## Estimasi buy order
+
+`estimateBuyOrders` adalah pure function terpisah dari kalkulasi material. Fungsi ini hanya menerima shopping list dan snapshot harga sebagai argumen; tidak melakukan HTTP atau membaca Sheets.
+
+```ts
+import { estimateBuyOrders } from "@albion-market-lab/crafting-calculator";
+
+const estimate = estimateBuyOrders({
+  shoppingList: [{ itemId: "T4_ORE", quantity: 10 }],
+  prices,
+  asOf: "2026-10-28T06:00:00Z",
+  staleAfterHours: 6,
+  bidIncrement: 1,
+});
+```
+
+Hanya snapshot `server: "East/Asia"`, quality yang sama (default `1`), item ID persis termasuk suffix enchantment, dan lima Royal City yang dipakai. Harga BUY nol/kosong atau timestamp invalid menjadi `missing`. Data stale tetap ditampilkan, tetapi coverage menjadi `partial` dan kota saran tidak diklaim definitif termurah. Contoh kontrak lengkap tersedia di [`examples/buy-order-estimate.json`](examples/buy-order-estimate.json).
 
 ### Menjalankan validasi
 
