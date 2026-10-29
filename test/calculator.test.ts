@@ -89,6 +89,22 @@ describe("calculateMaterials", () => {
     expect(result.recipeWarnings).toEqual([]);
   });
 
+  it("does not warn for canonical Ore, Hide, Fiber, Wood, and Rock resources", () => {
+    const rawIds = ["T2_ORE", "T3_ORE", "T4_ORE", "T4_HIDE", "T4_FIBER", "T4_WOOD", "T4_ROCK"];
+    const catalog: CatalogData = {
+      items: [
+        { itemId: "RAW_RESOURCE_ITEM", displayName: "Raw resource item", enchantment: 0, category: "equipment", purchasable: false, terminalStatus: "requires_recipe", nameStatus: "name_verified", hasCraftingRecipe: true, hasRefiningRecipe: false, sourceUrl: "fixture" },
+        ...rawIds.map((itemId) => ({ itemId, displayName: itemId, enchantment: 0, category: "raw", purchasable: true, terminalStatus: "terminal" as const, nameStatus: "name_verified", hasCraftingRecipe: false, hasRefiningRecipe: false, sourceUrl: "fixture" })),
+      ],
+      craftingRecipes: [{ recipeId: "CRAFT_RAW_RESOURCE_ITEM", recipeType: "crafting", outputItemId: "RAW_RESOURCE_ITEM", outputQuantity: 1, ingredients: rawIds.map((itemId) => ({ itemId, quantity: 1 })), validationStatus: "fixture", sourceUrl: "fixture" }],
+      refiningRecipes: [],
+    };
+    const result = calculateMaterials({ targets: [{ itemId: "RAW_RESOURCE_ITEM", quantity: 1 }], catalog });
+    expect(result.shoppingList).toEqual(rawIds.map((itemId) => ({ itemId, quantity: 1 })).sort((a, b) => a.itemId.localeCompare(b.itemId)));
+    expect(result.refiningPlan).toEqual([]);
+    expect(result.recipeWarnings).toEqual([]);
+  });
+
   it("does not treat an unknown recipe as a terminal material", () => {
     const catalog: CatalogData = { ...catalogFixture, items: catalogFixture.items.map((item) => item.itemId === "REFINED_A" ? { ...item, purchasable: false } : item), refiningRecipes: catalogFixture.refiningRecipes.filter((recipe) => recipe.outputItemId !== "REFINED_A") };
     expect(errorCode(() => calculateMaterials({ targets: [{ itemId: "MULTI_MATERIAL_ITEM", quantity: 1 }], catalog }))).toBe("REFINING_RECIPE_NOT_FOUND");
