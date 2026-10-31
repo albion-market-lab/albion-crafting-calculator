@@ -37,8 +37,8 @@ describe("estimateBuyOrders", () => {
       asOf: "2026-10-28T06:00:00Z",
       staleAfterHours: 6,
     });
-    expect(result).toMatchObject({ status: "unavailable", estimatedTotal: null, priceOnlyEstimatedTotal: 213 });
-    expect(result.materials[0]).toMatchObject({ coverage: "partial", cheapestCity: "Martlock", cheapestBidPrice: 71 });
+    expect(result).toMatchObject({ status: "unavailable", estimatedTotal: null, priceOnlyEstimatedTotal: 243 });
+    expect(result.materials[0]).toMatchObject({ coverage: "partial", cheapestCity: "Bridgewatch", cheapestBidPrice: 81, priceOnlySubtotal: 243 });
     expect(result.materials[0]!.candidates.find(({ city }) => city === "Bridgewatch")).toMatchObject({ status: "fresh", ageHours: 3 });
     expect(result.materials[0]!.candidates.find(({ city }) => city === "Martlock")).toMatchObject({ status: "stale", ageHours: 10 });
   });
@@ -126,6 +126,43 @@ describe("estimateBuyOrders", () => {
     const reasons = Object.fromEntries(result.materials[0]!.candidates.map(({ city, bestValueReason }) => [city, bestValueReason]));
     expect(reasons).toMatchObject({ Bridgewatch: "INSUFFICIENT_HISTORY", Martlock: "LOW_TRADING_ACTIVITY", Lymhurst: "ELIGIBLE", "Fort Sterling": "STALE_MARKET_DATA", Thetford: "NO_ECONOMIC_ADVANTAGE" });
     expect(result.materials[0]).toMatchObject({ suggestedCity: "Lymhurst", suggestedBidPrice: 103, estimatedSubtotal: 10_300 });
-    expect(result.estimatedTotal).toBeNull();
+    expect(result).toMatchObject({ estimatedTotal: 10_300, status: "complete" });
+  });
+
+  it("totals every recommended material even when unrelated city coverage is partial", () => {
+    const result = estimateBuyOrders({
+      shoppingList: [{ itemId: "T4_ORE", quantity: 10 }, { itemId: "T4_HIDE", quantity: 20 }],
+      prices: [price("T4_ORE", "Martlock", 100), price("T4_HIDE", "Thetford", 200)],
+      activity: [activity("T4_ORE", "Martlock", 1_000), activity("T4_HIDE", "Thetford", 1_000)],
+      asOf: "2026-10-28T06:00:00Z", staleAfterHours: 6,
+    });
+    expect(result.materials.map(({ coverage }) => coverage)).toEqual(["partial", "partial"]);
+    expect(result.materials.map(({ suggestedCity }) => suggestedCity)).toEqual(["Martlock", "Thetford"]);
+    expect(result).toMatchObject({ status: "complete", estimatedTotal: 5_030, priceOnlyEstimatedTotal: 5_030 });
+    expect(result.warnings.filter(({ code }) => code === "PARTIAL_COVERAGE")).toHaveLength(2);
+  });
+
+  it("keeps totals null when one required material has no recommendation", () => {
+    const result = estimateBuyOrders({
+      shoppingList: [{ itemId: "T4_ORE", quantity: 10 }, { itemId: "T4_HIDE", quantity: 20 }],
+      prices: [price("T4_ORE", "Martlock", 100), price("T4_HIDE", "Thetford", 200)],
+      activity: [activity("T4_ORE", "Martlock", 1_000)],
+      asOf: "2026-10-28T06:00:00Z", staleAfterHours: 6,
+    });
+    expect(result.materials[0]?.suggestedCity).toBe("Martlock");
+    expect(result.materials[1]?.suggestedCity).toBeUndefined();
+    expect(result).toMatchObject({ status: "partial", estimatedTotal: null, priceOnlyEstimatedTotal: 5_030 });
+  });
+
+  it("never labels or totals entirely stale prices as current cheapest", () => {
+    const result = estimateBuyOrders({
+      shoppingList: [{ itemId: "T6_ORE", quantity: 5 }],
+      prices: [price("T6_ORE", "Bridgewatch", 1, "2026-10-27T00:00:00Z"), price("T6_ORE", "Martlock", 10, "2026-10-27T01:00:00Z")],
+      asOf: "2026-10-28T06:00:00Z", staleAfterHours: 6,
+    });
+    expect(result.materials[0]).toMatchObject({ coverage: "partial" });
+    expect(result.materials[0]?.cheapestCity).toBeUndefined();
+    expect(result.materials[0]?.priceOnlySubtotal).toBeUndefined();
+    expect(result.priceOnlyEstimatedTotal).toBeNull();
   });
 });

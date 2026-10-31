@@ -96,7 +96,7 @@ export function estimateBuyOrders(input: BuyOrderEstimateInput): BuyOrderEstimat
     const coverage = available.length === ROYAL_CITIES.length && available.every(({ status }) => status === "fresh") ? "complete" : available.length ? "partial" : "none";
     if (coverage === "partial") warnings.push({ code: "PARTIAL_COVERAGE", itemId, message: `City coverage for '${itemId}' is partial; the suggested city is not a definitive cheapest-city claim.` });
     const material: MaterialBuyOrderEstimate = { itemId, quantity, quality, candidates, coverage };
-    const cheapest = available[0];
+    const cheapest = fresh[0];
     if (cheapest) { material.cheapestCity = cheapest.city; material.cheapestBidPrice = cheapest.bidPrice; material.priceOnlySubtotal = cheapest.subtotal; }
     const suggestion = candidates.filter((candidate): candidate is CityPriceCandidate & { bidPrice: number; subtotal: number; averageDailyUnits: number } => candidate.bestValueReason === "ELIGIBLE").sort((a, b) => a.bidPrice - b.bidPrice || b.averageDailyUnits - a.averageDailyUnits || cityOrder.get(a.city)! - cityOrder.get(b.city)!)[0];
     if (suggestion) { material.suggestedCity = suggestion.city; material.suggestedBidPrice = suggestion.bidPrice; material.estimatedSubtotal = suggestion.subtotal; }
@@ -104,7 +104,7 @@ export function estimateBuyOrders(input: BuyOrderEstimateInput): BuyOrderEstimat
   }
 
   const recommended = materials.filter((material): material is MaterialBuyOrderEstimate & { estimatedSubtotal: number } => material.estimatedSubtotal !== undefined);
-  const completeRecommendation = recommended.length === materials.length && materials.every(({ coverage }) => coverage === "complete");
+  const completeRecommendation = recommended.length === materials.length;
   const estimatedTotal = completeRecommendation ? recommended.reduce((total, material) => total + material.estimatedSubtotal, 0) : null;
   const priced = materials.filter((material): material is MaterialBuyOrderEstimate & { priceOnlySubtotal: number } => material.priceOnlySubtotal !== undefined);
   const priceOnlyEstimatedTotal = priced.length === materials.length ? priced.reduce((total, material) => total + material.priceOnlySubtotal, 0) : null;

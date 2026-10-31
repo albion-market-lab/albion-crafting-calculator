@@ -63,7 +63,7 @@ const estimate = estimateBuyOrders({
 });
 ```
 
-Hanya snapshot `server: "East/Asia"`, quality yang sama (default `1`), item ID persis termasuk suffix enchantment, dan lima Royal City yang dipakai. `cheapestCity` tetap merupakan informasi harga saja. `suggestedCity` hanya tersedia bila harga fresh, bid masih dalam premium 8%, history memiliki minimal lima hari lengkap dan observasi terbaru, serta kapasitas konservatif 48 jam mencukupi quantity. Nilai policy tetap diekspor sebagai `BEST_VALUE_POLICY`; heuristik ini bukan jaminan order terisi.
+Hanya snapshot `server: "East/Asia"`, quality yang sama (default `1`), item ID persis termasuk suffix enchantment, dan lima Royal City yang dipakai. `cheapestCity` dan estimasi price-only hanya memakai harga fresh. `suggestedCity` hanya tersedia bila harga fresh, bid masih dalam premium 8%, history memiliki minimal lima hari lengkap dan observasi terbaru, serta kapasitas konservatif 48 jam mencukupi quantity. Total Best Value tersedia ketika setiap material memiliki rekomendasi valid; coverage kota parsial tetap dilaporkan terpisah. Nilai policy tetap diekspor sebagai `BEST_VALUE_POLICY`; heuristik ini bukan jaminan order terisi.
 
 ### Menjalankan validasi
 
