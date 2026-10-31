@@ -106,12 +106,25 @@ export interface MarketPrice {
 export interface BuyOrderEstimateInput {
   shoppingList: ShoppingListItem[];
   prices: MarketPrice[];
+  activity?: MarketActivity[];
   asOf: string;
   staleAfterHours: number;
   bidIncrement?: number;
   server?: "East/Asia";
   quality?: number;
 }
+
+export interface MarketActivity {
+  server: string;
+  itemId: string;
+  city: string;
+  quality: number;
+  averageDailyUnits: number;
+  coverageDays: number;
+  observedAt: string;
+}
+
+export type BestValueReason = "PRICE_TOO_HIGH" | "LOW_TRADING_ACTIVITY" | "INSUFFICIENT_HISTORY" | "STALE_MARKET_DATA" | "MISSING_MARKET_DATA" | "NO_ECONOMIC_ADVANTAGE" | "ELIGIBLE";
 
 export interface CityPriceCandidate {
   city: RoyalCity;
@@ -121,6 +134,11 @@ export interface CityPriceCandidate {
   ageHours?: number;
   bidPrice?: number;
   subtotal?: number;
+  lowestSellPrice?: number;
+  averageDailyUnits?: number;
+  activityCoverageDays?: number;
+  activityCapacity48h?: number;
+  bestValueReason: BestValueReason;
 }
 
 export interface MaterialBuyOrderEstimate {
@@ -129,6 +147,9 @@ export interface MaterialBuyOrderEstimate {
   quality: number;
   candidates: CityPriceCandidate[];
   coverage: "complete" | "partial" | "none";
+  cheapestCity?: RoyalCity;
+  cheapestBidPrice?: number;
+  priceOnlySubtotal?: number;
   suggestedCity?: RoyalCity;
   suggestedBidPrice?: number;
   estimatedSubtotal?: number;
@@ -144,6 +165,7 @@ export interface PriceWarning {
 export interface BuyOrderEstimateResult {
   materials: MaterialBuyOrderEstimate[];
   estimatedTotal: number | null;
+  priceOnlyEstimatedTotal: number | null;
   status: "complete" | "partial" | "unavailable";
   warnings: PriceWarning[];
 }

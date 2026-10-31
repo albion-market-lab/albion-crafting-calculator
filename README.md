@@ -48,7 +48,7 @@ Fixture unit test memakai ID dan rasio sintetis untuk menguji aritmetika. Fixtur
 
 ## Estimasi buy order
 
-`estimateBuyOrders` adalah pure function terpisah dari kalkulasi material. Fungsi ini hanya menerima shopping list dan snapshot harga sebagai argumen; tidak melakukan HTTP atau membaca Sheets.
+`estimateBuyOrders` adalah pure function terpisah dari kalkulasi material. Fungsi ini menerima shopping list, snapshot harga, dan agregat aktivitas pasar; tidak melakukan HTTP atau membaca Sheets.
 
 ```ts
 import { estimateBuyOrders } from "@albion-market-lab/crafting-calculator";
@@ -56,13 +56,14 @@ import { estimateBuyOrders } from "@albion-market-lab/crafting-calculator";
 const estimate = estimateBuyOrders({
   shoppingList: [{ itemId: "T4_ORE", quantity: 10 }],
   prices,
+  activity,
   asOf: "2026-10-28T06:00:00Z",
   staleAfterHours: 6,
   bidIncrement: 1,
 });
 ```
 
-Hanya snapshot `server: "East/Asia"`, quality yang sama (default `1`), item ID persis termasuk suffix enchantment, dan lima Royal City yang dipakai. Harga BUY nol/kosong atau timestamp invalid menjadi `missing`. Data stale tetap ditampilkan, tetapi coverage menjadi `partial` dan kota saran tidak diklaim definitif termurah. Contoh kontrak lengkap tersedia di [`examples/buy-order-estimate.json`](examples/buy-order-estimate.json).
+Hanya snapshot `server: "East/Asia"`, quality yang sama (default `1`), item ID persis termasuk suffix enchantment, dan lima Royal City yang dipakai. `cheapestCity` tetap merupakan informasi harga saja. `suggestedCity` hanya tersedia bila harga fresh, bid masih dalam premium 8%, history memiliki minimal lima hari lengkap dan observasi terbaru, serta kapasitas konservatif 48 jam mencukupi quantity. Nilai policy tetap diekspor sebagai `BEST_VALUE_POLICY`; heuristik ini bukan jaminan order terisi.
 
 ### Menjalankan validasi
 
@@ -83,7 +84,7 @@ Pengguna dapat membuat **satu crafting plan berisi banyak target sekaligus**: mi
 4. Gabungkan bahan yang sama lintas semua target **sebelum** membuat shopping list.
 5. Terapkan aturan kuantitas dan pembulatan tiap resep sesuai output per proses; jangan membulatkan total di tempat yang salah.
 6. Cocokkan bahan yang harus dibeli dengan snapshot harga lokal dari [receiver](https://github.com/albion-market-lab/albion-market-receiver).
-7. Untuk setiap material, rekomendasikan kota BO dari **Bridgewatch, Martlock, Lymhurst, Fort Sterling, Thetford** berdasarkan harga yang tersedia.
+7. Untuk setiap material, rekomendasikan kota BO dari **Bridgewatch, Martlock, Lymhurst, Fort Sterling, Thetford** hanya jika harga dan aktivitas lolos policy Best Value.
 8. Kembalikan shopping list per kota, rencana refining, target output crafting, estimasi modal, dan status kelengkapan data.
 
 ## Kontrak input/output (rancangan)
