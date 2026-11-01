@@ -124,7 +124,7 @@ export interface MarketActivity {
   observedAt: string;
 }
 
-export type BestValueReason = "PRICE_TOO_HIGH" | "LOW_TRADING_ACTIVITY" | "INSUFFICIENT_HISTORY" | "STALE_MARKET_DATA" | "MISSING_MARKET_DATA" | "NO_ECONOMIC_ADVANTAGE" | "ELIGIBLE";
+export type BestValueReason = "EXCEEDS_TWO_DAY_TARGET" | "MISSING_ACTIVITY" | "NO_TRADING_ACTIVITY" | "INSUFFICIENT_HISTORY" | "STALE_ACTIVITY" | "STALE_MARKET_DATA" | "MISSING_MARKET_DATA" | "ELIGIBLE";
 
 export interface CityPriceCandidate {
   city: RoyalCity;
@@ -137,7 +137,7 @@ export interface CityPriceCandidate {
   lowestSellPrice?: number;
   averageDailyUnits?: number;
   activityCoverageDays?: number;
-  activityCapacity48h?: number;
+  estimatedDays?: number;
   bestValueReason: BestValueReason;
 }
 

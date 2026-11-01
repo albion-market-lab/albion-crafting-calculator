@@ -83,26 +83,24 @@ describe("estimateBuyOrders", () => {
     expect(result.materials.map(({ priceOnlySubtotal }) => priceOnlySubtotal)).toEqual([24, 66]);
   });
 
-  it("prefers a slightly more expensive city when the cheapest city cannot cover the required quantity", () => {
+  it("recommends the cheapest city that can meet the quantity within two days", () => {
     const result = estimateBuyOrders({
-      shoppingList: [{ itemId: "T4_ORE", quantity: 100 }],
-      prices: fiveCities("T4_ORE", [100, 105, 120, 130, 140]),
-      activity: [activity("T4_ORE", "Bridgewatch", 100), activity("T4_ORE", "Martlock", 1_000), ...ROYAL_CITIES.slice(2).map((city) => activity("T4_ORE", city, 5_000))],
+      shoppingList: [{ itemId: "T4_ORE", quantity: 3_000 }],
+      prices: fiveCities("T4_ORE", [99, 114, 124, 130, 140]),
+      activity: [activity("T4_ORE", "Bridgewatch", 1_000), activity("T4_ORE", "Martlock", 2_000), ...ROYAL_CITIES.slice(2).map((city) => activity("T4_ORE", city, 6_000))],
       asOf: "2026-10-28T06:00:00Z", staleAfterHours: 6,
     });
-    expect(result.materials[0]).toMatchObject({ cheapestCity: "Bridgewatch", suggestedCity: "Martlock", suggestedBidPrice: 106, estimatedSubtotal: 10_600 });
-    expect(result.materials[0]!.candidates.find(({ city }) => city === "Bridgewatch")).toMatchObject({ bestValueReason: "LOW_TRADING_ACTIVITY", activityCapacity48h: 40 });
-    expect(result.materials[0]!.candidates.find(({ city }) => city === "Martlock")).toMatchObject({ bestValueReason: "ELIGIBLE" });
+    expect(result.materials[0]).toMatchObject({ cheapestCity: "Bridgewatch", suggestedCity: "Martlock", suggestedBidPrice: 115, estimatedSubtotal: 345_000 });
+    expect(result.materials[0]!.candidates.find(({ city }) => city === "Bridgewatch")).toMatchObject({ bestValueReason: "EXCEEDS_TWO_DAY_TARGET", estimatedDays: 3 });
+    expect(result.materials[0]!.candidates.find(({ city }) => city === "Martlock")).toMatchObject({ bestValueReason: "ELIGIBLE", estimatedDays: 1.5 });
   });
 
-  it("rejects high-volume cities outside the price premium and changes eligibility with quantity", () => {
-    const base = { prices: fiveCities("T4_HIDE", [100, 110, 130, 140, 150]), activity: ROYAL_CITIES.map((city) => activity("T4_HIDE", city, 1_000)), asOf: "2026-10-28T06:00:00Z", staleAfterHours: 6 };
-    const small = estimateBuyOrders({ ...base, shoppingList: [{ itemId: "T4_HIDE", quantity: 300 }] });
+  it("allows a qualifying city above the former premium limit and changes eligibility with quantity", () => {
+    const base = { prices: fiveCities("T4_HIDE", [99, 114, 130, 140, 150]), activity: [activity("T4_HIDE", "Bridgewatch", 1_000), ...ROYAL_CITIES.slice(1).map((city) => activity("T4_HIDE", city, 2_000))], asOf: "2026-10-28T06:00:00Z", staleAfterHours: 6 };
+    const small = estimateBuyOrders({ ...base, shoppingList: [{ itemId: "T4_HIDE", quantity: 1_000 }] });
     expect(small.materials[0]).toMatchObject({ suggestedCity: "Bridgewatch" });
-    expect(small.materials[0]!.candidates.find(({ city }) => city === "Martlock")?.bestValueReason).toBe("PRICE_TOO_HIGH");
-    const large = estimateBuyOrders({ ...base, shoppingList: [{ itemId: "T4_HIDE", quantity: 500 }] });
-    expect(large.materials[0]?.suggestedCity).toBeUndefined();
-    expect(large.materials[0]!.candidates[0]?.bestValueReason).toBe("LOW_TRADING_ACTIVITY");
+    const large = estimateBuyOrders({ ...base, shoppingList: [{ itemId: "T4_HIDE", quantity: 3_000 }] });
+    expect(large.materials[0]).toMatchObject({ cheapestCity: "Bridgewatch", suggestedCity: "Martlock", suggestedBidPrice: 115 });
   });
 
   it("uses volume then Royal City order as deterministic tie breakers", () => {
@@ -114,19 +112,75 @@ describe("estimateBuyOrders", () => {
     expect(result.materials[0]).toMatchObject({ suggestedCity: "Martlock", suggestedBidPrice: 101, estimatedSubtotal: 1_010 });
   });
 
-  it("distinguishes insufficient history, low activity, stale prices, and sell sanity failures", () => {
+  it("keeps the cheaper eligible city even when another city has much higher volume", () => {
+    const result = estimateBuyOrders({
+      shoppingList: [{ itemId: "T5_FIBER", quantity: 1_000 }], prices: fiveCities("T5_FIBER", [99, 104, 120, 130, 140]),
+      activity: [activity("T5_FIBER", "Bridgewatch", 5_000), activity("T5_FIBER", "Martlock", 25_000)],
+      asOf: "2026-10-28T06:00:00Z", staleAfterHours: 6,
+    });
+    expect(result.materials[0]).toMatchObject({ suggestedCity: "Bridgewatch", suggestedBidPrice: 100 });
+    expect(result.materials[0]!.candidates.find(({ city }) => city === "Bridgewatch")?.estimatedDays).toBe(0.2);
+  });
+
+  it("accepts exactly two days, rejects slightly above two, and leaves all-slow materials unrecommended", () => {
+    const result = estimateBuyOrders({
+      shoppingList: [{ itemId: "T5_HIDE", quantity: 2_000 }], prices: fiveCities("T5_HIDE", [99, 104, 119, 129, 139]),
+      activity: [activity("T5_HIDE", "Bridgewatch", 999.9), activity("T5_HIDE", "Martlock", 1_000), ...ROYAL_CITIES.slice(2).map((city) => activity("T5_HIDE", city, 500))],
+      asOf: "2026-10-28T06:00:00Z", staleAfterHours: 6,
+    });
+    expect(result.materials[0]).toMatchObject({ cheapestCity: "Bridgewatch", suggestedCity: "Martlock", suggestedBidPrice: 105 });
+    expect(result.materials[0]!.candidates.find(({ city }) => city === "Bridgewatch")).toMatchObject({ bestValueReason: "EXCEEDS_TWO_DAY_TARGET", estimatedDays: expect.any(Number) });
+    expect(result.materials[0]!.candidates.find(({ city }) => city === "Martlock")).toMatchObject({ bestValueReason: "ELIGIBLE", estimatedDays: 2 });
+
+    const none = estimateBuyOrders({
+      shoppingList: [{ itemId: "T5_HIDE", quantity: 3_000 }], prices: fiveCities("T5_HIDE", [99, 104, 119, 129, 139]),
+      activity: ROYAL_CITIES.map((city) => activity("T5_HIDE", city, 1_000)), asOf: "2026-10-28T06:00:00Z", staleAfterHours: 6,
+    });
+    expect(none.materials[0]).toMatchObject({ cheapestCity: "Bridgewatch" });
+    expect(none.materials[0]?.suggestedCity).toBeUndefined();
+    expect(none).toMatchObject({ status: "unavailable", estimatedTotal: null, priceOnlyEstimatedTotal: 300_000 });
+  });
+
+  it("does not use Lowest Sell Order as an eligibility filter", () => {
+    const result = estimateBuyOrders({
+      shoppingList: [{ itemId: "T6_ORE", quantity: 800 }],
+      prices: [
+        price("T6_ORE", "Bridgewatch", 46, observedAt, { lowestSellPrice: 47, lowestSellObservedAt: "2026-10-28T05:00:00Z" }),
+        price("T6_ORE", "Martlock", 48, observedAt, { lowestSellPrice: 48, lowestSellObservedAt: "2026-10-28T05:00:00Z" }),
+      ],
+      activity: [activity("T6_ORE", "Bridgewatch", 1_000), activity("T6_ORE", "Martlock", 1_000)],
+      asOf: "2026-10-28T06:00:00Z", staleAfterHours: 6,
+    });
+    expect(result.materials[0]).toMatchObject({ suggestedCity: "Bridgewatch", suggestedBidPrice: 47 });
+    expect(result.materials[0]!.candidates.find(({ city }) => city === "Bridgewatch")).toMatchObject({ lowestSellPrice: 47, bestValueReason: "ELIGIBLE", estimatedDays: 0.8 });
+    expect(result.materials[0]!.candidates.find(({ city }) => city === "Martlock")).toMatchObject({ lowestSellPrice: 48, bestValueReason: "ELIGIBLE" });
+  });
+
+  it("reports zero, stale, and missing activity without producing misleading durations", () => {
+    const result = estimateBuyOrders({
+      shoppingList: [{ itemId: "T6_HIDE", quantity: 100 }], prices: fiveCities("T6_HIDE", [100, 101, 102, 103, 104]),
+      activity: [activity("T6_HIDE", "Bridgewatch", 0), activity("T6_HIDE", "Martlock", 1_000, 6, "2026-10-27T00:00:00Z")],
+      asOf: "2026-10-28T06:00:00Z", staleAfterHours: 6,
+    });
+    expect(result.materials[0]!.candidates.find(({ city }) => city === "Bridgewatch")).toMatchObject({ bestValueReason: "NO_TRADING_ACTIVITY", averageDailyUnits: 0 });
+    expect(result.materials[0]!.candidates.find(({ city }) => city === "Bridgewatch")?.estimatedDays).toBeUndefined();
+    expect(result.materials[0]!.candidates.find(({ city }) => city === "Martlock")).toMatchObject({ bestValueReason: "STALE_ACTIVITY", estimatedDays: 0.1 });
+    expect(result.materials[0]!.candidates.find(({ city }) => city === "Lymhurst")?.bestValueReason).toBe("MISSING_ACTIVITY");
+  });
+
+  it("distinguishes activity quality failures while keeping Lowest Sell Order informational", () => {
     const prices = fiveCities("T5_ORE", [100, 101, 102, 103, 104]);
     prices[3] = price("T5_ORE", "Fort Sterling", 103, "2026-10-27T00:00:00Z");
     prices[4] = price("T5_ORE", "Thetford", 104, observedAt, { lowestSellPrice: 105, lowestSellObservedAt: "2026-10-28T05:00:00Z" });
     const result = estimateBuyOrders({
-      shoppingList: [{ itemId: "T5_ORE", quantity: 100 }], prices,
-      activity: [activity("T5_ORE", "Bridgewatch", 1_000, 4), activity("T5_ORE", "Martlock", 100), activity("T5_ORE", "Lymhurst", 1_000), activity("T5_ORE", "Thetford", 1_000)],
+      shoppingList: [{ itemId: "T5_ORE", quantity: 300 }], prices,
+      activity: [activity("T5_ORE", "Bridgewatch", 1_000, 4), activity("T5_ORE", "Martlock", 100), activity("T5_ORE", "Thetford", 1_000)],
       asOf: "2026-10-28T06:00:00Z", staleAfterHours: 6,
     });
     const reasons = Object.fromEntries(result.materials[0]!.candidates.map(({ city, bestValueReason }) => [city, bestValueReason]));
-    expect(reasons).toMatchObject({ Bridgewatch: "INSUFFICIENT_HISTORY", Martlock: "LOW_TRADING_ACTIVITY", Lymhurst: "ELIGIBLE", "Fort Sterling": "STALE_MARKET_DATA", Thetford: "NO_ECONOMIC_ADVANTAGE" });
-    expect(result.materials[0]).toMatchObject({ suggestedCity: "Lymhurst", suggestedBidPrice: 103, estimatedSubtotal: 10_300 });
-    expect(result).toMatchObject({ estimatedTotal: 10_300, status: "complete" });
+    expect(reasons).toMatchObject({ Bridgewatch: "INSUFFICIENT_HISTORY", Martlock: "EXCEEDS_TWO_DAY_TARGET", Lymhurst: "MISSING_ACTIVITY", "Fort Sterling": "STALE_MARKET_DATA", Thetford: "ELIGIBLE" });
+    expect(result.materials[0]).toMatchObject({ suggestedCity: "Thetford", suggestedBidPrice: 105, estimatedSubtotal: 31_500 });
+    expect(result).toMatchObject({ estimatedTotal: 31_500, status: "complete" });
   });
 
   it("totals every recommended material even when unrelated city coverage is partial", () => {

@@ -2,8 +2,7 @@ import { CalculationError } from "./errors.js";
 import { ROYAL_CITIES, type BuyOrderEstimateInput, type BuyOrderEstimateResult, type CityPriceCandidate, type MarketActivity, type MarketPrice, type MaterialBuyOrderEstimate, type PriceWarning, type RoyalCity } from "./types.js";
 
 export const BEST_VALUE_POLICY = {
-  maxPricePremiumRatio: 0.08, activityLookbackDays: 7, activityCoverageDays: 5,
-  evaluationIntervalHours: 24, activityHorizonHours: 48, conservativeVolumeFactor: 0.20,
+  maxEstimatedDays: 2, activityCoverageDays: 5, evaluationIntervalHours: 24,
   priceStaleAfterHours: 6, bidIncrement: 1,
 } as const;
 
@@ -71,25 +70,26 @@ export function estimateBuyOrders(input: BuyOrderEstimateInput): BuyOrderEstimat
       const freshSell = Number.isSafeInteger(observed.value.lowestSellPrice) && observed.value.lowestSellPrice! > 0 && Number.isFinite(sellObservedAtMs) && sellObservedAtMs <= asOfMs && (asOfMs - sellObservedAtMs) / HOUR_MS <= BEST_VALUE_POLICY.priceStaleAfterHours ? observed.value.lowestSellPrice! : undefined;
       const marketActivity = activity.get(`${itemId}\0${city}`);
       const averageDailyUnits = marketActivity?.value.averageDailyUnits;
-      const activityCapacity48h = averageDailyUnits === undefined ? undefined : averageDailyUnits * (BEST_VALUE_POLICY.activityHorizonHours / 24) * BEST_VALUE_POLICY.conservativeVolumeFactor;
+      const estimatedDays = averageDailyUnits !== undefined && averageDailyUnits > 0 ? quantity / averageDailyUnits : undefined;
       return {
         city, status, highestBuyPrice: price, observedAt: new Date(observed.observedAtMs).toISOString(), ageHours, bidPrice, subtotal,
         ...(freshSell === undefined ? {} : { lowestSellPrice: freshSell }),
-        ...(averageDailyUnits === undefined ? {} : { averageDailyUnits, activityCoverageDays: marketActivity!.value.coverageDays, activityCapacity48h: activityCapacity48h! }),
+        ...(averageDailyUnits === undefined ? {} : { averageDailyUnits, activityCoverageDays: marketActivity!.value.coverageDays }),
+        ...(estimatedDays === undefined ? {} : { estimatedDays }),
         bestValueReason: status === "stale" ? "STALE_MARKET_DATA" : "INSUFFICIENT_HISTORY",
       };
     });
 
     const available = candidates.filter((candidate): candidate is CityPriceCandidate & { bidPrice: number; subtotal: number } => candidate.status !== "missing").sort((a, b) => a.bidPrice - b.bidPrice || cityOrder.get(a.city)! - cityOrder.get(b.city)!);
     const fresh = available.filter((candidate) => candidate.status === "fresh");
-    const cheapestFreshBid = fresh[0]?.bidPrice;
     for (const candidate of fresh) {
       const marketActivity = activity.get(`${itemId}\0${candidate.city}`);
       const activityAgeHours = marketActivity ? (asOfMs - marketActivity.observedAtMs) / HOUR_MS : Infinity;
-      if (cheapestFreshBid !== undefined && candidate.bidPrice > cheapestFreshBid * (1 + BEST_VALUE_POLICY.maxPricePremiumRatio)) candidate.bestValueReason = "PRICE_TOO_HIGH";
-      else if (candidate.lowestSellPrice !== undefined && candidate.bidPrice >= candidate.lowestSellPrice) candidate.bestValueReason = "NO_ECONOMIC_ADVANTAGE";
-      else if (!marketActivity || marketActivity.value.coverageDays < BEST_VALUE_POLICY.activityCoverageDays || activityAgeHours > BEST_VALUE_POLICY.evaluationIntervalHours) candidate.bestValueReason = "INSUFFICIENT_HISTORY";
-      else if (candidate.activityCapacity48h! < quantity) candidate.bestValueReason = "LOW_TRADING_ACTIVITY";
+      if (!marketActivity) candidate.bestValueReason = "MISSING_ACTIVITY";
+      else if (marketActivity.value.coverageDays < BEST_VALUE_POLICY.activityCoverageDays) candidate.bestValueReason = "INSUFFICIENT_HISTORY";
+      else if (activityAgeHours > BEST_VALUE_POLICY.evaluationIntervalHours) candidate.bestValueReason = "STALE_ACTIVITY";
+      else if (candidate.estimatedDays === undefined) candidate.bestValueReason = "NO_TRADING_ACTIVITY";
+      else if (candidate.estimatedDays > BEST_VALUE_POLICY.maxEstimatedDays) candidate.bestValueReason = "EXCEEDS_TWO_DAY_TARGET";
       else candidate.bestValueReason = "ELIGIBLE";
     }
 
