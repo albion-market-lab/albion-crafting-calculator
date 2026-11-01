@@ -70,6 +70,10 @@ export interface ProcessPlan {
   surplusQuantity: number;
 }
 
+export interface ProcessMaterialBreakdown extends ProcessPlan {
+  ingredients: Array<{ itemId: string; quantity: number }>;
+}
+
 export interface ShoppingListItem {
   itemId: string;
   quantity: number;
@@ -83,7 +87,9 @@ export interface RecipeWarning {
 
 export interface CalculationResult {
   craftOutputs: ProcessPlan[];
+  craftingMaterialBreakdown: ProcessMaterialBreakdown[];
   refiningPlan: ProcessPlan[];
+  refiningMaterialBreakdown: ProcessMaterialBreakdown[];
   shoppingList: ShoppingListItem[];
   recipeWarnings: RecipeWarning[];
 }

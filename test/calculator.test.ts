@@ -12,17 +12,20 @@ const errorCode = (fn: () => unknown): string | undefined => calculationError(fn
 describe("calculateMaterials", () => {
   it("calculates one target with one terminal material", () => {
     const result = calculateMaterials({ targets: [{ itemId: "ONE_MATERIAL_ITEM", quantity: 2 }], catalog: catalogFixture });
+    expect(result.craftingMaterialBreakdown).toEqual([{ itemId: "ONE_MATERIAL_ITEM", requiredQuantity: 2, processCount: 2, outputQuantity: 2, surplusQuantity: 0, ingredients: [{ itemId: "RAW_A", quantity: 6 }] }]);
     expect(result.shoppingList).toEqual([{ itemId: "RAW_A", quantity: 6 }]);
     expect(result.refiningPlan).toEqual([]);
   });
 
   it("calculates one target with multiple material types", () => {
     const result = calculateMaterials({ targets: [{ itemId: "MULTI_MATERIAL_ITEM", quantity: 2 }], catalog: catalogFixture });
+    expect(result.craftingMaterialBreakdown[0]?.ingredients).toEqual([{ itemId: "REFINED_A", quantity: 4 }, { itemId: "RAW_B", quantity: 2 }]);
     expect(result.shoppingList).toEqual([{ itemId: "RAW_A", quantity: 6 }, { itemId: "RAW_B", quantity: 2 }]);
   });
 
   it("aggregates a shared material across multiple targets", () => {
     const result = calculateMaterials({ targets: [{ itemId: "ONE_MATERIAL_ITEM", quantity: 2 }, { itemId: "SHARED_MATERIAL_ITEM", quantity: 3 }], catalog: catalogFixture });
+    expect(result.craftingMaterialBreakdown.map(({ ingredients }) => ingredients)).toEqual([[{ itemId: "RAW_A", quantity: 6 }], [{ itemId: "RAW_A", quantity: 12 }]]);
     expect(result.shoppingList).toContainEqual({ itemId: "RAW_A", quantity: 18 });
   });
 
@@ -31,6 +34,10 @@ describe("calculateMaterials", () => {
     expect(result.refiningPlan).toEqual([
       { itemId: "REFINED_HIGH", requiredQuantity: 2, processCount: 1, outputQuantity: 2, surplusQuantity: 0 },
       { itemId: "REFINED_A", requiredQuantity: 3, processCount: 2, outputQuantity: 4, surplusQuantity: 1 },
+    ]);
+    expect(result.refiningMaterialBreakdown).toEqual([
+      { itemId: "REFINED_HIGH", requiredQuantity: 2, processCount: 1, outputQuantity: 2, surplusQuantity: 0, ingredients: [{ itemId: "REFINED_A", quantity: 3 }, { itemId: "RAW_B", quantity: 1 }] },
+      { itemId: "REFINED_A", requiredQuantity: 3, processCount: 2, outputQuantity: 4, surplusQuantity: 1, ingredients: [{ itemId: "RAW_A", quantity: 6 }] },
     ]);
     expect(result.shoppingList).toEqual([{ itemId: "RAW_A", quantity: 6 }, { itemId: "RAW_B", quantity: 1 }, { itemId: "SPECIAL", quantity: 1 }]);
   });
@@ -54,6 +61,7 @@ describe("calculateMaterials", () => {
   it("rounds process count using recipe output quantity", () => {
     const result = calculateMaterials({ targets: [{ itemId: "BATCH_ITEM", quantity: 4 }], catalog: catalogFixture });
     expect(result.craftOutputs).toEqual([{ itemId: "BATCH_ITEM", requiredQuantity: 4, processCount: 2, outputQuantity: 6, surplusQuantity: 2 }]);
+    expect(result.craftingMaterialBreakdown).toEqual([{ itemId: "BATCH_ITEM", requiredQuantity: 4, processCount: 2, outputQuantity: 6, surplusQuantity: 2, ingredients: [{ itemId: "REFINED_HIGH", quantity: 4 }, { itemId: "SPECIAL", quantity: 2 }] }]);
     expect(result.refiningPlan[0]).toMatchObject({ itemId: "REFINED_HIGH", requiredQuantity: 4, processCount: 2 });
   });
 
@@ -141,6 +149,7 @@ describe("calculateMaterials", () => {
     const result = calculateMaterials({ targets: [{ itemId: "BATCH_ITEM", quantity: 1 }, { itemId: "BATCH_ITEM", quantity: 2 }], catalog: catalogFixture });
     expect(result.craftOutputs).toHaveLength(1);
     expect(result.craftOutputs[0]).toMatchObject({ requiredQuantity: 3, processCount: 1, outputQuantity: 3 });
+    expect(result.craftingMaterialBreakdown).toEqual([{ itemId: "BATCH_ITEM", requiredQuantity: 3, processCount: 1, outputQuantity: 3, surplusQuantity: 0, ingredients: [{ itemId: "REFINED_HIGH", quantity: 2 }, { itemId: "SPECIAL", quantity: 1 }] }]);
   });
 
   it.each([0, 1.5, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1])("rejects unsafe target quantity %s", (quantity) => {

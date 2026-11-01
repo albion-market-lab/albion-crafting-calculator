@@ -114,7 +114,9 @@ type CalculationInput = {
 ```
 
 Output minimal:
-- `craftOutputs`: target equipment dan kuantitas.
+- `craftOutputs`: target equipment dan detail output proses yang tetap kompatibel.
+- `craftingMaterialBreakdown`: kebutuhan ingredient crafting langsung per target, sebelum ekspansi refining.
+- `refiningMaterialBreakdown`: kebutuhan ingredient langsung per langkah refining; projection ini tidak menambah demand baru.
 - `refiningPlan`: jenis refined material, tier, dan kuantitas yang harus diproses.
 - `shoppingList`: material mentah/terminal, quantity, kota usulan, dan dasar harga BO.
 - `priceWarnings`: harga **segar / lama / kosong** per item-kota sesuai timestamp.

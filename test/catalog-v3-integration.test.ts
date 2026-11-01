@@ -14,6 +14,10 @@ describe("CatalogData v3 integration", () => {
       catalog,
     });
     expect(result.craftOutputs).toEqual(expected.craftOutputs);
+    expect(result.craftingMaterialBreakdown).toEqual([
+      { itemId: "T6_ARMOR_CLOTH_SET1", requiredQuantity: 100, processCount: 100, outputQuantity: 100, surplusQuantity: 0, ingredients: [{ itemId: "T6_CLOTH", quantity: 1600 }] },
+      { itemId: "T5_SHOES_PLATE_SET1", requiredQuantity: 20, processCount: 20, outputQuantity: 20, surplusQuantity: 0, ingredients: [{ itemId: "T5_METALBAR", quantity: 160 }] },
+    ]);
     expect(result.refiningPlan).toEqual(expected.refiningPlan);
     expect(result.shoppingList).toEqual(expected.shoppingList);
     expect(result.recipeWarnings).toEqual([]);
@@ -27,6 +31,18 @@ describe("CatalogData v3 integration", () => {
     expect(result.craftOutputs).toEqual(expected.craftOutputs);
     expect(result.refiningPlan).toEqual(expected.refiningPlan);
     expect(result.shoppingList).toEqual(expected.shoppingList);
+  });
+
+  it("reconciles every direct crafting and refining input exactly once", () => {
+    assertCatalogDataV3(catalog);
+    const result = calculateMaterials({ targets: expected.targets, catalog });
+    const demand = new Map<string, number>();
+    for (const step of [...result.craftingMaterialBreakdown, ...result.refiningMaterialBreakdown]) {
+      for (const ingredient of step.ingredients) demand.set(ingredient.itemId, (demand.get(ingredient.itemId) ?? 0) + ingredient.quantity);
+    }
+    for (const step of result.refiningPlan) expect(demand.get(step.itemId)).toBe(step.requiredQuantity);
+    for (const item of result.shoppingList) expect(demand.get(item.itemId)).toBe(item.quantity);
+    expect([...demand.keys()].sort()).toEqual([...result.refiningPlan.map(({ itemId }) => itemId), ...result.shoppingList.map(({ itemId }) => itemId)].sort());
   });
 
   it("types the importer manifest as schema v3", () => {

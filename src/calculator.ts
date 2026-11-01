@@ -1,6 +1,6 @@
 import { CalculationError } from "./errors.js";
 import { RecipeResolver } from "./recipe-resolver.js";
-import type { CalculationInput, CalculationResult, ProcessPlan, RecipeWarning } from "./types.js";
+import type { CalculationInput, CalculationResult, ProcessMaterialBreakdown, ProcessPlan, RecipeWarning } from "./types.js";
 
 const add = (map: Map<string, number>, itemId: string, quantity: number): void => {
   const total = (map.get(itemId) ?? 0) + quantity;
@@ -21,13 +21,20 @@ export function calculateMaterials(input: CalculationInput): CalculationResult {
 
   const materialDemand = new Map<string, number>();
   const craftOutputs: ProcessPlan[] = [];
+  const craftingMaterialBreakdown: ProcessMaterialBreakdown[] = [];
   for (const [itemId, requiredQuantity] of targets) {
     const recipe = resolver.requireCraftingRecipe(itemId);
     const processCount = Math.ceil(requiredQuantity / recipe.outputQuantity);
     const outputQuantity = processCount * recipe.outputQuantity;
     if (!Number.isSafeInteger(outputQuantity)) throw new CalculationError("INVALID_INPUT", `Craft output for '${itemId}' exceeds the safe integer range.`, { itemId, outputQuantity });
     craftOutputs.push({ itemId, requiredQuantity, processCount, outputQuantity, surplusQuantity: outputQuantity - requiredQuantity });
-    recipe.ingredients.forEach((ingredient) => add(materialDemand, ingredient.itemId, ingredient.quantity * processCount));
+    const directIngredients = new Map<string, number>();
+    recipe.ingredients.forEach((ingredient) => {
+      const quantity = ingredient.quantity * processCount;
+      add(materialDemand, ingredient.itemId, quantity);
+      add(directIngredients, ingredient.itemId, quantity);
+    });
+    craftingMaterialBreakdown.push({ itemId, requiredQuantity, processCount, outputQuantity, surplusQuantity: outputQuantity - requiredQuantity, ingredients: [...directIngredients].map(([ingredientId, quantity]) => ({ itemId: ingredientId, quantity })) });
   }
 
   const depths = new Map<string, number>();
@@ -57,6 +64,7 @@ export function calculateMaterials(input: CalculationInput): CalculationResult {
   [...materialDemand.keys()].forEach((itemId) => visit(itemId, []));
 
   const refiningPlan: ProcessPlan[] = [];
+  const refiningMaterialBreakdown: ProcessMaterialBreakdown[] = [];
   const ordered = [...depths.entries()].filter(([, depth]) => depth > 0).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   for (const [itemId] of ordered) {
     const requiredQuantity = materialDemand.get(itemId) ?? 0;
@@ -66,7 +74,13 @@ export function calculateMaterials(input: CalculationInput): CalculationResult {
     const outputQuantity = processCount * recipe.outputQuantity;
     if (!Number.isSafeInteger(outputQuantity)) throw new CalculationError("INVALID_INPUT", `Refining output for '${itemId}' exceeds the safe integer range.`, { itemId, outputQuantity });
     refiningPlan.push({ itemId, requiredQuantity, processCount, outputQuantity, surplusQuantity: outputQuantity - requiredQuantity });
-    recipe.ingredients.forEach((ingredient) => add(materialDemand, ingredient.itemId, ingredient.quantity * processCount));
+    const directIngredients = new Map<string, number>();
+    recipe.ingredients.forEach((ingredient) => {
+      const quantity = ingredient.quantity * processCount;
+      add(materialDemand, ingredient.itemId, quantity);
+      add(directIngredients, ingredient.itemId, quantity);
+    });
+    refiningMaterialBreakdown.push({ itemId, requiredQuantity, processCount, outputQuantity, surplusQuantity: outputQuantity - requiredQuantity, ingredients: [...directIngredients].map(([ingredientId, quantity]) => ({ itemId: ingredientId, quantity })) });
   }
 
   const shoppingList = [...materialDemand.entries()]
@@ -79,5 +93,5 @@ export function calculateMaterials(input: CalculationInput): CalculationResult {
     message: `Material '${itemId}' is terminal but requires special procurement handling.`,
   }));
 
-  return { craftOutputs, refiningPlan, shoppingList, recipeWarnings };
+  return { craftOutputs, craftingMaterialBreakdown, refiningPlan, refiningMaterialBreakdown, shoppingList, recipeWarnings };
 }
