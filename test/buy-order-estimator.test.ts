@@ -91,6 +91,7 @@ describe("estimateBuyOrders", () => {
       asOf: "2026-10-28T06:00:00Z", staleAfterHours: 6,
     });
     expect(result.materials[0]).toMatchObject({ cheapestCity: "Bridgewatch", suggestedCity: "Martlock", suggestedBidPrice: 115, estimatedSubtotal: 345_000 });
+    expect(result.materials[0]?.activityCoverage).toEqual({ validCities: 5, totalCities: 5 });
     expect(result.materials[0]!.candidates.find(({ city }) => city === "Bridgewatch")).toMatchObject({ bestValueReason: "EXCEEDS_TWO_DAY_TARGET", estimatedDays: 3 });
     expect(result.materials[0]!.candidates.find(({ city }) => city === "Martlock")).toMatchObject({ bestValueReason: "ELIGIBLE", estimatedDays: 1.5 });
   });
@@ -120,6 +121,15 @@ describe("estimateBuyOrders", () => {
     });
     expect(result.materials[0]).toMatchObject({ suggestedCity: "Bridgewatch", suggestedBidPrice: 100 });
     expect(result.materials[0]!.candidates.find(({ city }) => city === "Bridgewatch")?.estimatedDays).toBe(0.2);
+  });
+
+  it("keeps a valid recommendation separate from one-of-five activity coverage", () => {
+    const result = estimateBuyOrders({
+      shoppingList: [{ itemId: "T5_ORE", quantity: 1_000 }], prices: fiveCities("T5_ORE", [99, 104, 109, 114, 119]),
+      activity: [activity("T5_ORE", "Martlock", 2_000)], asOf: "2026-10-28T06:00:00Z", staleAfterHours: 6,
+    });
+    expect(result).toMatchObject({ status: "complete", estimatedTotal: 105_000 });
+    expect(result.materials[0]).toMatchObject({ coverage: "complete", activityCoverage: { validCities: 1, totalCities: 5 }, suggestedCity: "Martlock" });
   });
 
   it("accepts exactly two days, rejects slightly above two, and leaves all-slow materials unrecommended", () => {
@@ -166,6 +176,30 @@ describe("estimateBuyOrders", () => {
     expect(result.materials[0]!.candidates.find(({ city }) => city === "Bridgewatch")?.estimatedDays).toBeUndefined();
     expect(result.materials[0]!.candidates.find(({ city }) => city === "Martlock")).toMatchObject({ bestValueReason: "STALE_ACTIVITY", estimatedDays: 0.1 });
     expect(result.materials[0]!.candidates.find(({ city }) => city === "Lymhurst")?.bestValueReason).toBe("MISSING_ACTIVITY");
+    expect(result.materials[0]?.activityCoverage).toEqual({ validCities: 1, totalCities: 5 });
+  });
+
+  it("keeps activity duration when BO price is missing or stale without making it eligible", () => {
+    const result = estimateBuyOrders({
+      shoppingList: [{ itemId: "T6_FIBER", quantity: 3_000 }],
+      prices: [
+        price("T6_FIBER", "Bridgewatch", null),
+        price("T6_FIBER", "Martlock", 114),
+        price("T6_FIBER", "Lymhurst", 90, "2026-10-27T00:00:00Z"),
+        price("T6_FIBER", "Thetford", 124),
+      ],
+      activity: [
+        activity("T6_FIBER", "Bridgewatch", 2_000),
+        activity("T6_FIBER", "Martlock", 1_000),
+        activity("T6_FIBER", "Lymhurst", 2_000),
+        activity("T6_FIBER", "Thetford", 3_000),
+      ],
+      asOf: "2026-10-28T06:00:00Z", staleAfterHours: 6,
+    });
+    expect(result.materials[0]!.candidates.find(({ city }) => city === "Bridgewatch")).toMatchObject({ status: "missing", activityStatus: "valid", estimatedDays: 1.5, bestValueReason: "MISSING_MARKET_DATA" });
+    expect(result.materials[0]!.candidates.find(({ city }) => city === "Bridgewatch")?.subtotal).toBeUndefined();
+    expect(result.materials[0]!.candidates.find(({ city }) => city === "Lymhurst")).toMatchObject({ status: "stale", activityStatus: "valid", estimatedDays: 1.5, bestValueReason: "STALE_MARKET_DATA" });
+    expect(result.materials[0]).toMatchObject({ suggestedCity: "Thetford", suggestedBidPrice: 125, estimatedSubtotal: 375_000, activityCoverage: { validCities: 4, totalCities: 5 } });
   });
 
   it("distinguishes activity quality failures while keeping Lowest Sell Order informational", () => {
@@ -191,6 +225,7 @@ describe("estimateBuyOrders", () => {
       asOf: "2026-10-28T06:00:00Z", staleAfterHours: 6,
     });
     expect(result.materials.map(({ coverage }) => coverage)).toEqual(["partial", "partial"]);
+    expect(result.materials.map(({ activityCoverage }) => activityCoverage)).toEqual([{ validCities: 1, totalCities: 5 }, { validCities: 1, totalCities: 5 }]);
     expect(result.materials.map(({ suggestedCity }) => suggestedCity)).toEqual(["Martlock", "Thetford"]);
     expect(result).toMatchObject({ status: "complete", estimatedTotal: 5_030, priceOnlyEstimatedTotal: 5_030 });
     expect(result.warnings.filter(({ code }) => code === "PARTIAL_COVERAGE")).toHaveLength(2);

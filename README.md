@@ -65,6 +65,8 @@ const estimate = estimateBuyOrders({
 
 Hanya snapshot `server: "East/Asia"`, quality yang sama (default `1`), item ID persis termasuk suffix enchantment, dan lima Royal City yang dipakai. `cheapestCity` dan estimasi price-only hanya memakai harga fresh. `suggestedCity` adalah Competitive BO termurah di antara kota dengan minimal lima hari history lengkap, observasi aktivitas terbaru, dan `quantity / averageDailyUnits <= 2`. Lowest Sell Order tetap informasional. Total Best Value tersedia ketika setiap material memiliki rekomendasi valid; coverage kota parsial tetap dilaporkan terpisah. Nilai policy tetap diekspor sebagai `BEST_VALUE_POLICY`; estimasi hari memakai 100% volume pasar historis dan bukan jaminan Buy Order terisi.
 
+`status` tetap menunjukkan kelengkapan rekomendasi antar-material. `activityCoverage.validCities/totalCities` secara terpisah menunjukkan berapa Royal City yang memiliki observasi aktivitas fresh dengan minimal lima hari lengkap; volume nol tetap dihitung sebagai observasi valid tetapi tidak eligible.
+
 ### Menjalankan validasi
 
 ```sh

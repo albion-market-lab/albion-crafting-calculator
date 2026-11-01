@@ -1,5 +1,5 @@
 import { CalculationError } from "./errors.js";
-import { ROYAL_CITIES, type BuyOrderEstimateInput, type BuyOrderEstimateResult, type CityPriceCandidate, type MarketActivity, type MarketPrice, type MaterialBuyOrderEstimate, type PriceWarning, type RoyalCity } from "./types.js";
+import { ROYAL_CITIES, type ActivityDataStatus, type BuyOrderEstimateInput, type BuyOrderEstimateResult, type CityPriceCandidate, type MarketActivity, type MarketPrice, type MaterialBuyOrderEstimate, type PriceWarning, type RoyalCity } from "./types.js";
 
 export const BEST_VALUE_POLICY = {
   maxEstimatedDays: 2, activityCoverageDays: 5, evaluationIntervalHours: 24,
@@ -10,6 +10,13 @@ const HOUR_MS = 3_600_000;
 const cityOrder = new Map<RoyalCity, number>(ROYAL_CITIES.map((city, index) => [city, index]));
 interface ObservedPrice { value: MarketPrice; observedAtMs: number }
 interface ObservedActivity { value: MarketActivity; observedAtMs: number }
+
+function activityStatus(observed: ObservedActivity | undefined, asOfMs: number): ActivityDataStatus {
+  if (!observed) return "missing";
+  if (observed.value.coverageDays < BEST_VALUE_POLICY.activityCoverageDays) return "insufficient_history";
+  if ((asOfMs - observed.observedAtMs) / HOUR_MS > BEST_VALUE_POLICY.evaluationIntervalHours) return "stale";
+  return observed.value.averageDailyUnits === 0 ? "no_volume" : "valid";
+}
 
 export function estimateBuyOrders(input: BuyOrderEstimateInput): BuyOrderEstimateResult {
   const asOfMs = Date.parse(input.asOf);
@@ -56,9 +63,17 @@ export function estimateBuyOrders(input: BuyOrderEstimateInput): BuyOrderEstimat
     const candidates: CityPriceCandidate[] = ROYAL_CITIES.map((city) => {
       const observed = newest.get(`${itemId}\0${city}`);
       const price = observed?.value.highestBuyPrice;
+      const marketActivity = activity.get(`${itemId}\0${city}`);
+      const averageDailyUnits = marketActivity?.value.averageDailyUnits;
+      const estimatedDays = averageDailyUnits !== undefined && averageDailyUnits > 0 ? quantity / averageDailyUnits : undefined;
+      const activityFields = {
+        activityStatus: activityStatus(marketActivity, asOfMs),
+        ...(averageDailyUnits === undefined ? {} : { averageDailyUnits, activityCoverageDays: marketActivity!.value.coverageDays }),
+        ...(estimatedDays === undefined ? {} : { estimatedDays }),
+      };
       if (!observed || typeof price !== "number" || !Number.isSafeInteger(price) || price <= 0) {
         warnings.push({ code: "MISSING_PRICE", itemId, city, message: `BUY price for '${itemId}' in ${city} is missing.` });
-        return observed ? { city, status: "missing", observedAt: new Date(observed.observedAtMs).toISOString(), ageHours: (asOfMs - observed.observedAtMs) / HOUR_MS, bestValueReason: "MISSING_MARKET_DATA" } : { city, status: "missing", bestValueReason: "MISSING_MARKET_DATA" };
+        return observed ? { city, status: "missing", observedAt: new Date(observed.observedAtMs).toISOString(), ageHours: (asOfMs - observed.observedAtMs) / HOUR_MS, ...activityFields, bestValueReason: "MISSING_MARKET_DATA" } : { city, status: "missing", ...activityFields, bestValueReason: "MISSING_MARKET_DATA" };
       }
       const bidPrice = price + bidIncrement;
       const subtotal = bidPrice * quantity;
@@ -68,14 +83,10 @@ export function estimateBuyOrders(input: BuyOrderEstimateInput): BuyOrderEstimat
       if (status === "stale") warnings.push({ code: "STALE_PRICE", itemId, city, message: `BUY price for '${itemId}' in ${city} is ${ageHours} hours old.` });
       const sellObservedAtMs = Date.parse(observed.value.lowestSellObservedAt ?? "");
       const freshSell = Number.isSafeInteger(observed.value.lowestSellPrice) && observed.value.lowestSellPrice! > 0 && Number.isFinite(sellObservedAtMs) && sellObservedAtMs <= asOfMs && (asOfMs - sellObservedAtMs) / HOUR_MS <= BEST_VALUE_POLICY.priceStaleAfterHours ? observed.value.lowestSellPrice! : undefined;
-      const marketActivity = activity.get(`${itemId}\0${city}`);
-      const averageDailyUnits = marketActivity?.value.averageDailyUnits;
-      const estimatedDays = averageDailyUnits !== undefined && averageDailyUnits > 0 ? quantity / averageDailyUnits : undefined;
       return {
         city, status, highestBuyPrice: price, observedAt: new Date(observed.observedAtMs).toISOString(), ageHours, bidPrice, subtotal,
         ...(freshSell === undefined ? {} : { lowestSellPrice: freshSell }),
-        ...(averageDailyUnits === undefined ? {} : { averageDailyUnits, activityCoverageDays: marketActivity!.value.coverageDays }),
-        ...(estimatedDays === undefined ? {} : { estimatedDays }),
+        ...activityFields,
         bestValueReason: status === "stale" ? "STALE_MARKET_DATA" : "INSUFFICIENT_HISTORY",
       };
     });
@@ -83,11 +94,10 @@ export function estimateBuyOrders(input: BuyOrderEstimateInput): BuyOrderEstimat
     const available = candidates.filter((candidate): candidate is CityPriceCandidate & { bidPrice: number; subtotal: number } => candidate.status !== "missing").sort((a, b) => a.bidPrice - b.bidPrice || cityOrder.get(a.city)! - cityOrder.get(b.city)!);
     const fresh = available.filter((candidate) => candidate.status === "fresh");
     for (const candidate of fresh) {
-      const marketActivity = activity.get(`${itemId}\0${candidate.city}`);
-      const activityAgeHours = marketActivity ? (asOfMs - marketActivity.observedAtMs) / HOUR_MS : Infinity;
-      if (!marketActivity) candidate.bestValueReason = "MISSING_ACTIVITY";
-      else if (marketActivity.value.coverageDays < BEST_VALUE_POLICY.activityCoverageDays) candidate.bestValueReason = "INSUFFICIENT_HISTORY";
-      else if (activityAgeHours > BEST_VALUE_POLICY.evaluationIntervalHours) candidate.bestValueReason = "STALE_ACTIVITY";
+      if (candidate.activityStatus === "missing") candidate.bestValueReason = "MISSING_ACTIVITY";
+      else if (candidate.activityStatus === "insufficient_history") candidate.bestValueReason = "INSUFFICIENT_HISTORY";
+      else if (candidate.activityStatus === "stale") candidate.bestValueReason = "STALE_ACTIVITY";
+      else if (candidate.activityStatus === "no_volume") candidate.bestValueReason = "NO_TRADING_ACTIVITY";
       else if (candidate.estimatedDays === undefined) candidate.bestValueReason = "NO_TRADING_ACTIVITY";
       else if (candidate.estimatedDays > BEST_VALUE_POLICY.maxEstimatedDays) candidate.bestValueReason = "EXCEEDS_TWO_DAY_TARGET";
       else candidate.bestValueReason = "ELIGIBLE";
@@ -95,7 +105,8 @@ export function estimateBuyOrders(input: BuyOrderEstimateInput): BuyOrderEstimat
 
     const coverage = available.length === ROYAL_CITIES.length && available.every(({ status }) => status === "fresh") ? "complete" : available.length ? "partial" : "none";
     if (coverage === "partial") warnings.push({ code: "PARTIAL_COVERAGE", itemId, message: `City coverage for '${itemId}' is partial; the suggested city is not a definitive cheapest-city claim.` });
-    const material: MaterialBuyOrderEstimate = { itemId, quantity, quality, candidates, coverage };
+    const validActivityCities = candidates.filter(({ activityStatus }) => activityStatus === "valid" || activityStatus === "no_volume").length;
+    const material: MaterialBuyOrderEstimate = { itemId, quantity, quality, candidates, coverage, activityCoverage: { validCities: validActivityCities, totalCities: ROYAL_CITIES.length } };
     const cheapest = fresh[0];
     if (cheapest) { material.cheapestCity = cheapest.city; material.cheapestBidPrice = cheapest.bidPrice; material.priceOnlySubtotal = cheapest.subtotal; }
     const suggestion = candidates.filter((candidate): candidate is CityPriceCandidate & { bidPrice: number; subtotal: number; averageDailyUnits: number } => candidate.bestValueReason === "ELIGIBLE").sort((a, b) => a.bidPrice - b.bidPrice || b.averageDailyUnits - a.averageDailyUnits || cityOrder.get(a.city)! - cityOrder.get(b.city)!)[0];

@@ -125,6 +125,7 @@ export interface MarketActivity {
 }
 
 export type BestValueReason = "EXCEEDS_TWO_DAY_TARGET" | "MISSING_ACTIVITY" | "NO_TRADING_ACTIVITY" | "INSUFFICIENT_HISTORY" | "STALE_ACTIVITY" | "STALE_MARKET_DATA" | "MISSING_MARKET_DATA" | "ELIGIBLE";
+export type ActivityDataStatus = "valid" | "no_volume" | "missing" | "insufficient_history" | "stale";
 
 export interface CityPriceCandidate {
   city: RoyalCity;
@@ -138,6 +139,7 @@ export interface CityPriceCandidate {
   averageDailyUnits?: number;
   activityCoverageDays?: number;
   estimatedDays?: number;
+  activityStatus: ActivityDataStatus;
   bestValueReason: BestValueReason;
 }
 
@@ -147,6 +149,7 @@ export interface MaterialBuyOrderEstimate {
   quality: number;
   candidates: CityPriceCandidate[];
   coverage: "complete" | "partial" | "none";
+  activityCoverage: { validCities: number; totalCities: number };
   cheapestCity?: RoyalCity;
   cheapestBidPrice?: number;
   priceOnlySubtotal?: number;
